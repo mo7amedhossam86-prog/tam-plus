@@ -355,7 +355,7 @@ select.inp{cursor:pointer}
 
     <!-- REGISTER -->
     <div class="auth-form" id="form-register">
-      <div class="form-group"><label class="form-label">الاسم الكامل</label><input class="inp" id="reg-name" placeholder="اسمك كامل"></div>
+      <div class="form-group"><label class="form-label">اسم المستخدم (لازم ينتهي بـ TAM)</label><input class="inp" id="reg-name" placeholder="مثال: ExampleTAM"><div style="font-size:9px;color:var(--muted);margin-top:4px;line-height:1.6">حرف أول كابيتال، باقي الاسم سمول، وينتهي إجبارياً بـ TAM كابيتال بالكامل ومتصلة — بدون أرقام أو مسافات. مثال صحيح: <b style="color:var(--gold)">AhmedTAM</b></div></div>
       <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" id="reg-email" type="email" placeholder="example@email.com"></div>
       <div class="form-group"><label class="form-label">كلمة المرور (8 أحرف على الأقل)</label><input class="inp" id="reg-pass" type="password" placeholder="••••••••"></div>
       <div class="auth-err" id="reg-err"></div>
@@ -416,7 +416,7 @@ select.inp{cursor:pointer}
           <div style="display:flex;gap:8px" id="pending-members-btn"></div>
         </div>
         <div class="data-table">
-          <div class="t-header" style="grid-template-columns:2fr 1.3fr .7fr 1.5fr .9fr 1.5fr"><span>الاسم</span><span>الرتبة</span><span>المستوى</span><span>XP</span><span>الحالة</span><span>إجراءات</span></div>
+          <div class="t-header" style="grid-template-columns:1.8fr 1.2fr .6fr 1.4fr .8fr 2.2fr"><span>الاسم</span><span>الرتبة</span><span>المستوى</span><span>XP</span><span>الحالة</span><span>إجراءات</span></div>
           <div id="members-list"></div>
         </div>
       </div>
@@ -447,13 +447,23 @@ select.inp{cursor:pointer}
       <div class="page" id="page-mytasks">
         <div class="page-title"><div class="pt-l"><i class="ti ti-checklist"></i>مهامي</div></div>
         <div id="my-tasks-list"></div>
+        <div class="sec-title" style="margin-top:20px">👥 المهام الجماعية — سابق زملاءك واكسب الـ XP</div>
+        <div id="group-tasks-list"></div>
+      </div>
+
+      <!-- GROUP TASKS (leader only) -->
+      <div class="page" id="page-grouptasks">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-users-group"></i>المهام الجماعية</div>
+          <button class="btn-primary" style="width:auto;padding:8px 16px;font-size:12px" onclick="showAddTask()">+ مهمة جماعية جديدة</button>
+        </div>
+        <div id="group-tasks-leader-list"></div>
       </div>
 
       <!-- RANKS -->
       <div class="page" id="page-ranks">
         <div class="page-title"><div class="pt-l"><i class="ti ti-trophy"></i>نظام الرتب والمستويات</div></div>
         <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:14px;margin-bottom:16px;font-size:11px;color:var(--muted);line-height:1.9">
-          🎮 كل رتبة تحتوي على <b style="color:var(--blue)">3 مستويات</b> — L1: <b style="color:var(--blue)">50 XP</b> — L2: <b style="color:var(--blue)">75 XP</b> — L3: <b style="color:var(--blue)">120 XP</b> — بعد L3 يترقى العضو للرتبة التالية بموافقة القائد
+          🎮 كل رتبة تحتوي على <b style="color:var(--blue)">3 مستويات</b> — L1: <b style="color:var(--blue)" id="rk-l1">50</b> XP — L2: <b style="color:var(--blue)" id="rk-l2">75</b> XP — L3: <b style="color:var(--blue)" id="rk-l3">120</b> XP — بعد L3 يترقى العضو للرتبة التالية بموافقة القائد
         </div>
         <div class="rank-grid" id="rank-grid"></div>
       </div>
@@ -479,9 +489,12 @@ select.inp{cursor:pointer}
             </div>
             <div class="chat-msgs" id="chat-msgs"><div style="text-align:center;color:var(--muted);font-size:11px;margin:auto;padding:20px">اختر محادثة من القائمة</div></div>
             <div class="chat-inp-row">
+              <input type="file" id="c-file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip" style="display:none" onchange="onChatFileSelected()">
+              <button class="send-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="document.getElementById('c-file').click()" title="إرفاق ملف/صورة/فيديو"><i class="ti ti-paperclip" style="font-size:14px;color:var(--muted)"></i></button>
               <input class="chat-inp" id="c-inp" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter')sendMsg()">
               <button class="send-btn" onclick="sendMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
             </div>
+            <div id="c-file-preview" style="display:none;padding:4px 13px;font-size:10px;color:var(--gold)"></div>
           </div>
         </div>
         <div style="margin-top:9px;padding:9px 13px;background:rgba(255,179,0,.05);border:1px solid rgba(255,179,0,.13);border-radius:9px;font-size:10px;color:var(--muted)">🔒 هذه المحادثات خاصة تماماً — لا يستطيع أي عضو الاطلاع على محادثات الآخرين</div>
@@ -633,6 +646,55 @@ const THREAT_LEVELS = [
 ];
 const BCLRS = ['#111111','#4B0082','#C0392B','#1A5276','#1E8449'];
 const AVATARCLRS = ['#29ABE2','#39C96B','#E94B4B','#F5E642','#9B59B6','#E67E22','#00BCD4','#FF4081','#4CAF50','#FF9800'];
+// عتبات الـ XP لكل مستوى — مصدر واحد موحّد يُستخدم في كل مكان (بدل تكرار القيم في أكثر من دالة)
+// L1=50 / L2=75 / L3=120 (الافتراضي) — قابلة للتعديل من صفحة الإعدادات، وتُحمّل من جدول settings عند الدخول
+let LEVEL_XP = [50, 75, 120];
+async function loadLevelXP() {
+  try {
+    const { data } = await sb.from('settings').select('*').in('key', ['xp_l1','xp_l2','xp_l3']);
+    const map = {}; (data||[]).forEach(r => map[r.key] = parseInt(r.value));
+    LEVEL_XP = [ map.xp_l1 || 50, map.xp_l2 || 75, map.xp_l3 || 120 ];
+  } catch(e) { LEVEL_XP = [50,75,120]; }
+}
+// اسم مستخدم صالح: حرف كابيتال أول، حروف سمول بعده، وينتهي إجبارياً بكلمة TAM بالكابيتال بالكامل — بدون أرقام أو مسافات
+const USERNAME_REGEX = /^[A-Z][a-z]+TAM$/;
+
+// ================================================================
+//  محرك موحّد لحساب XP/المستوى/الرتبة — يستخدم while loop عشان
+//  ياخد بالحسبان قفزات أكتر من مستوى في نفس العملية (يمنع الايرور القديم)
+// ================================================================
+function applyXPGain(prof, xpGain) {
+  let xp = (prof.xp || 0) + xpGain;
+  let level = prof.level || 1;
+  let rank = prof.rank || 'Member';
+  let maxXp = prof.max_xp || LEVEL_XP[0];
+  let promoted = false;
+  let rankMsg = '';
+
+  while (xp >= maxXp) {
+    if (level < 3) {
+      xp -= maxXp;
+      level++;
+      maxXp = LEVEL_XP[level - 1] || LEVEL_XP[2];
+      rankMsg = 'المستوى ' + level;
+      promoted = true;
+    } else {
+      const ri = RANKS.findIndex(r => r.n === rank);
+      if (ri >= 0 && ri < RANKS.length - 1) {
+        xp -= maxXp;
+        rank = RANKS[ri + 1].n;
+        level = 1;
+        maxXp = LEVEL_XP[0];
+        rankMsg = 'رتبة ' + rank;
+        promoted = true;
+      } else {
+        xp = maxXp; // أقصى رتبة ومستوى — نوقف عند السقف
+        break;
+      }
+    }
+  }
+  return { newXP: xp, newLevel: level, newRank: rank, newMaxXP: maxXp, promoted, rankMsg };
+}
 
 // ================================================================
 //  SUPABASE SETUP - إنشاء الجداول تلقائياً
@@ -732,10 +794,11 @@ function showAuth() {
   hide('app');
 }
 
-function showApp() {
+async function showApp() {
   hide('loading');
   hide('auth-screen');
   show('app');
+  await loadLevelXP();
   renderSidebar();
   renderTopbar();
   renderAll();
@@ -759,9 +822,17 @@ async function doLogin() {
 }
 
 async function doRegister() {
-  const name = v('reg-name'), email = v('reg-email'), pass = v('reg-pass');
+  const name = v('reg-name').trim(), email = v('reg-email'), pass = v('reg-pass');
   if (!name || !email || !pass) { setErr('reg-err','يرجى ملء جميع الحقول'); return; }
+  if (!USERNAME_REGEX.test(name)) {
+    setErr('reg-err','اسم غير صالح: لازم يبدأ بحرف كابيتال، والباقي سمول، وينتهي إجبارياً بـ TAM كابيتال ومتصلة (بدون أرقام أو مسافات) — مثال: AhmedTAM');
+    return;
+  }
   if (pass.length < 8) { setErr('reg-err','كلمة المرور 8 أحرف على الأقل'); return; }
+  // منع تكرار نفس الاسم أو اسم مشابه له (بتجاهل حالة الأحرف) — كل اسم لازم يكون فريد بين الأعضاء
+  const { data: existingNames } = await sb.from('profiles').select('full_name');
+  const nameTaken = (existingNames||[]).some(p => (p.full_name||'').toLowerCase() === name.toLowerCase());
+  if (nameTaken) { setErr('reg-err','هذا الاسم مستخدم بالفعل من عضو آخر — اختر اسماً مختلفاً'); return; }
   setErr('reg-err',''); setOk('reg-ok','');
   const btn = document.getElementById('reg-btn');
   btn.disabled = true; btn.textContent = 'جاري الإنشاء...';
@@ -773,6 +844,8 @@ async function doRegister() {
   // إنشاء profile في انتظار موافقة القائد
   if (data.user) {
     const isLeaderEmail = email === LEADER_EMAIL;
+    const { data: l1setting } = await sb.from('settings').select('value').eq('key','xp_l1').single();
+    const startMaxXP = parseInt(l1setting?.value) || 50;
     await sb.from('profiles').upsert({
       id: data.user.id,
       full_name: name,
@@ -780,7 +853,7 @@ async function doRegister() {
       rank: 'Member',
       level: 1,
       xp: 0,
-      max_xp: 50,
+      max_xp: startMaxXP,
       status: isLeaderEmail ? 'active' : 'pending',
       band: '',
       color: AVATARCLRS[Math.floor(Math.random() * AVATARCLRS.length)],
@@ -848,6 +921,7 @@ function renderSidebar() {
     <div class="nav-item" id="nav-members" onclick="navigate('members')"><i class="ti ti-users"></i><span>الأعضاء</span></div>
     <div class="nav-item" id="nav-pending" onclick="navigate('pending')"><i class="ti ti-user-check"></i><span>طلبات الانضمام</span></div>
     <div class="nav-item" id="nav-tasks" onclick="navigate('tasks')"><i class="ti ti-checklist"></i><span>المهام</span></div>
+    <div class="nav-item" id="nav-grouptasks" onclick="navigate('grouptasks')"><i class="ti ti-users-group"></i><span>المهام الجماعية</span></div>
     <div class="nav-item" id="nav-ranks" onclick="navigate('ranks')"><i class="ti ti-trophy"></i><span>الرتب</span></div>
     <div class="nav-divider"></div>
     <div class="nav-section">التواصل</div>
@@ -926,7 +1000,7 @@ function navigate(page) {
   if (page === 'members') loadMembers();
   if (page === 'pending') loadPending();
   if (page === 'tasks') loadTasks();
-  if (page === 'mytasks') { loadMyTasks(); loadTasks(); }
+  if (page === 'mytasks') { loadMyTasks(); loadTasks(); loadGroupTasks(); }
   if (page === 'news') loadNews();
   if (page === 'chat') initChat();
   if (page === 'room') { loadRoom(); setTimeout(loadRoomChat, 500); }
@@ -934,7 +1008,8 @@ function navigate(page) {
   if (page === 'bands') loadBands();
   if (page === 'profile') loadProfile();
   if (page === 'ranks') renderRanks();
-  if (page === 'settings') { loadSettingsRoomCode(); loadSettingsStats(); }
+  if (page === 'settings') { loadSettingsRoomCode(); loadSettingsStats(); loadXPInputs(); }
+  if (page === 'grouptasks') { loadGroupTasks(); }
 }
 let memberNotifs = []; // قائمة الإشعارات للعضو
 
@@ -948,25 +1023,38 @@ function startRealtimeSubscriptions() {
       }).subscribe();
     sb.channel("tasks-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
-        loadTasks(); loadDashboard();
+        loadTasks(); loadDashboard(); loadGroupTasks();
+      }).subscribe();
+    sb.channel("submissions-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_submissions" }, () => {
+        loadGroupTasks();
       }).subscribe();
     sb.channel("news-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "news" }, () => {
         loadNews();
       }).subscribe();
-    sb.channel("messages-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+    sb.channel("elite-messages-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "elite_messages" }, () => {
         loadRoomMessages();
       }).subscribe();
   } else {
     // الأعضاء — realtime لكل حاجة تخصهم
     sb.channel("my-tasks-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, (payload) => {
-        loadMyTasks();
+        loadMyTasks(); loadGroupTasks();
         // إشعار لو مهمة جديدة للعضو
         if (payload.eventType === 'INSERT' && payload.new?.assignee_id === currentUser.id) {
           addMemberNotif(`📋 مهمة جديدة: ${payload.new.title}`);
         }
+        if (payload.eventType === 'INSERT' && payload.new?.type === 'group') {
+          addMemberNotif(`👥 مهمة جماعية جديدة: ${payload.new.title}`);
+        }
+      }).subscribe();
+    sb.channel("my-submissions-changes")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "task_submissions", filter: `user_id=eq.${currentUser.id}` }, (payload) => {
+        loadGroupTasks();
+        if (payload.new?.status === 'approved') addMemberNotif('✅ تمت الموافقة على مشاركتك في مهمة جماعية!');
+        if (payload.new?.status === 'rejected') addMemberNotif('❌ تم رفض مشاركتك في مهمة جماعية');
       }).subscribe();
     sb.channel("news-member-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "news" }, (payload) => {
@@ -989,9 +1077,9 @@ function startRealtimeSubscriptions() {
         }
       }).subscribe();
     sb.channel("room-msg-member")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `chat_key=eq.room-elite` }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "elite_messages" }, (payload) => {
         loadRoomMessages();
-        addMemberNotif('💬 رسالة جديدة في غرفة النخبة');
+        if (payload.new?.sender_id !== currentUser.id) addMemberNotif('💬 رسالة جديدة في غرفة النخبة');
       }).subscribe();
   }
 }
@@ -1046,8 +1134,10 @@ async function loadDashboard() {
       <span style="color:var(--xp);font-weight:700;font-size:12px">${m.xp||0} XP</span>
     </div>`).join('') : emptyState('لا يوجد أعضاء بعد');
 
-  // Recent tasks
-  const { data: recentTasks } = await sb.from('tasks').select('*').order('created_at',{ascending:false}).limit(5);
+  // Recent tasks — خصوصية: القائد يشوف كل المهام، العضو ميشوفش غير مهامه هو + المهام الجماعية
+  let recentQ = sb.from('tasks').select('*').order('created_at',{ascending:false}).limit(5);
+  if (!isLeader) recentQ = sb.from('tasks').select('*').or(`assignee_id.eq.${currentUser.id},type.eq.group`).order('created_at',{ascending:false}).limit(5);
+  const { data: recentTasks } = await recentQ;
   el('dash-tasks-list').innerHTML = recentTasks?.length ? recentTasks.map(t => `
     <div class="t-row" style="grid-template-columns:2fr 1fr 1fr;cursor:pointer" onclick="navigate(isLeader?'tasks':'mytasks')">
       <span style="font-size:11px;font-weight:600">${t.title}</span>
@@ -1064,7 +1154,7 @@ async function loadMembers() {
   // القائد مش في قائمة الأعضاء
   const { data: members } = await sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL).order('xp', {ascending:false});
   el('members-list').innerHTML = members?.length ? members.map(m => `
-    <div class="t-row" style="grid-template-columns:2fr 1.3fr .7fr 1.5fr .9fr 1.5fr">
+    <div class="t-row" style="grid-template-columns:1.8fr 1.2fr .6fr 1.4fr .8fr 2.2fr">
       <div class="mn-cell">
         <div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'}">${(m.full_name||'?')[0]}</div>
         <div><div>${m.full_name||m.email}</div>${m.band?`<span style="font-size:9px;color:var(--gold)">🏷 ${m.band}</span>`:''}</div>
@@ -1075,6 +1165,7 @@ async function loadMembers() {
       <span style="font-size:11px;color:${m.status==='active'?'var(--green)':'var(--muted)'}">${m.status==='active'?'🟢 نشط':'🔴 غير نشط'}</span>
       <div class="act-btns">
         <button class="bs bg" onclick="promoteModal('${m.id}','${m.full_name||m.email}','${m.rank||'Member'}',${m.level||1},${m.xp||0},${m.max_xp||50})">⬆ ترقية</button>
+        <button class="bs bgold" onclick="penaltyModal('${m.id}','${(m.full_name||m.email).replace(/'/g,"\\'")}',${m.xp||0},${m.max_xp||50},${m.level||1},'${m.rank||'Member'}')">⚠️ عقاب</button>
         <button class="bs bb" onclick="openChatWith('${m.id}','${(m.full_name||m.email).replace(/'/g,"\\'")}','${m.color||'#29ABE2'}')">💬</button>
         <button class="bs br" onclick="kickMember('${m.id}')">×</button>
       </div>
@@ -1124,11 +1215,17 @@ async function rejectMember(id) {
 //  TASKS
 // ================================================================
 async function loadTasks() {
-  const { data: tasks } = await sb.from('tasks').select('*').order('created_at',{ascending:false});
+  // خصوصية المهام: القائد بس يشوف كل المهام الفردية — كل عضو ميشوفش غير مهامه هو
+  // (لوحة "المهام" دي أصلاً متاحة للقائد بس، لكن نتحقق برضه كطبقة حماية إضافية)
+  let query = sb.from('tasks').select('*').neq('type','group').order('created_at',{ascending:false});
+  if (!isLeader) query = query.eq('assignee_id', currentUser.id);
+  const { data: tasks } = await query;
   const p = (tasks||[]).filter(t=>t.status==='pending');
   const a = (tasks||[]).filter(t=>t.status==='active');
   const d = (tasks||[]).filter(t=>t.status==='done');
-  el('cnt-p').textContent = p.length; el('cnt-a').textContent = a.length; el('cnt-d').textContent = d.length;
+  if (el('cnt-p')) el('cnt-p').textContent = p.length;
+  if (el('cnt-a')) el('cnt-a').textContent = a.length;
+  if (el('cnt-d')) el('cnt-d').textContent = d.length;
 
   const isMyTask = t => t.assignee_id === currentUser.id;
   const mk = t => `
@@ -1145,9 +1242,9 @@ async function loadTasks() {
       </div>
     </div>`;
 
-  el('col-p').innerHTML = p.map(mk).join('') + (isLeader?`<button class="add-task-btn" onclick="showAddTask()">+ مهمة جديدة</button>`:'');
-  el('col-a').innerHTML = a.map(mk).join('');
-  el('col-d').innerHTML = d.map(mk).join('');
+  if (el('col-p')) el('col-p').innerHTML = p.map(mk).join('') + (isLeader?`<button class="add-task-btn" onclick="showAddTask()">+ مهمة جديدة</button>`:'');
+  if (el('col-a')) el('col-a').innerHTML = a.map(mk).join('');
+  if (el('col-d')) el('col-d').innerHTML = d.map(mk).join('');
 }
 
 async function advTask(id, status, assigneeId, xp) {
@@ -1162,35 +1259,7 @@ async function advTask(id, status, assigneeId, xp) {
     if (assigneeId && assigneeId !== currentUser.id) {
       const { data: prof } = await sb.from('profiles').select('*').eq('id',assigneeId).single();
       if (prof && prof.role !== 'leader') {
-        let newXP = (prof.xp||0) + xp;
-        let newLevel = prof.level||1;
-        let newRank = prof.rank||'Member';
-        let newMaxXP = prof.max_xp||50;
-        let promoted = false;
-        let rankMsg = '';
-        const xpPerLevel = [50, 75, 120];
-
-        if (newXP >= newMaxXP) {
-          if (newLevel < 3) {
-            newLevel++;
-            newXP = newXP - newMaxXP;
-            newMaxXP = xpPerLevel[newLevel-1] || 120;
-            rankMsg = 'المستوى ' + newLevel;
-            promoted = true;
-          } else {
-            const ri = RANKS.findIndex(r => r.n === newRank);
-            if (ri >= 0 && ri < RANKS.length - 1) {
-              newRank = RANKS[ri+1].n;
-              newLevel = 1;
-              newXP = 0;
-              newMaxXP = 50;
-              rankMsg = 'رتبة ' + newRank;
-              promoted = true;
-            } else {
-              newXP = newMaxXP;
-            }
-          }
-        }
+        const { newXP, newLevel, newRank, newMaxXP, promoted, rankMsg } = applyXPGain(prof, xp);
 
         await sb.from('profiles').update({xp: newXP, level: newLevel, rank: newRank, max_xp: newMaxXP}).eq('id', assigneeId);
 
@@ -1219,30 +1288,7 @@ async function memberCompleteTask(taskId, xp) {
   // Give XP to member
   const { data: prof } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
   if (prof) {
-    let newXP = (prof.xp||0) + xp;
-    let newLevel = prof.level||1;
-    let newRank = prof.rank||'Member';
-    let newMaxXP = prof.max_xp||50;
-    let promoted = false;
-    let rankMsg = '';
-    const xpPerLevel = [50, 75, 120];
-    if (newXP >= newMaxXP) {
-      if (newLevel < 3) {
-        newLevel++;
-        newXP = newXP - newMaxXP;
-        newMaxXP = xpPerLevel[newLevel-1]||120;
-        rankMsg = 'المستوى ' + newLevel;
-        promoted = true;
-      } else {
-        const ri = RANKS.findIndex(r => r.n === newRank);
-        if (ri >= 0 && ri < RANKS.length - 1) {
-          newRank = RANKS[ri+1].n;
-          newLevel = 1; newXP = 0; newMaxXP = 50;
-          rankMsg = 'رتبة ' + newRank;
-          promoted = true;
-        } else { newXP = newMaxXP; }
-      }
-    }
+    const { newXP, newLevel, newRank, newMaxXP, promoted, rankMsg } = applyXPGain(prof, xp);
     await sb.from('profiles').update({xp: newXP, level: newLevel, rank: newRank, max_xp: newMaxXP}).eq('id', currentUser.id);
     if (promoted) alert('🎉 تهانينا! ترقيت إلى ' + rankMsg);
     else alert('✅ أحسنت! حصلت على ' + xp + ' XP');
@@ -1254,6 +1300,92 @@ async function delTask(id) {
   if (!confirm('حذف المهمة؟')) return;
   await sb.from('tasks').delete().eq('id',id);
   loadTasks();
+}
+
+// ================================================================
+//  GROUP TASKS (مهام جماعية — يشوفها الكل ويتسابقوا عليها)
+// ================================================================
+async function loadGroupTasks() {
+  const { data: gTasks } = await sb.from('tasks').select('*').eq('type','group').order('created_at',{ascending:false});
+
+  if (isLeader) {
+    if (!el('group-tasks-leader-list')) return;
+    if (!gTasks?.length) { el('group-tasks-leader-list').innerHTML = emptyState('لا توجد مهام جماعية بعد'); return; }
+    const rows = await Promise.all(gTasks.map(async t => {
+      const { data: subs } = await sb.from('task_submissions').select('*').eq('task_id', t.id).order('created_at');
+      const subsHtml = subs?.length ? subs.map(s => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border)">
+          <span style="font-size:11px">${s.user_name} <span style="color:var(--muted);font-size:9px">— ${s.status==='approved'?'✅ مقبولة':s.status==='rejected'?'❌ مرفوضة':'⏳ بانتظار المراجعة'}</span></span>
+          ${s.status==='submitted'?`<div style="display:flex;gap:4px"><button class="bs bg" onclick="approveSubmission('${s.id}','${t.id}','${s.user_id}',${t.xp})">✓ قبول</button><button class="bs br" onclick="rejectSubmission('${s.id}','${t.id}')">✕ رفض</button></div>`:''}
+        </div>`).join('') : '<div style="font-size:10px;color:var(--muted);padding:6px 0">لا يوجد مقدّمين حتى الآن</div>';
+      return `<div class="task-card" style="margin-bottom:10px">
+        <div class="task-title">${t.title}</div>
+        <div style="font-size:10px;color:var(--muted);margin:4px 0">الحالة: ${t.status==='done'?'🔒 مغلقة':'🟢 مفتوحة'}</div>
+        <div class="task-meta"><span class="task-xp">+${t.xp} XP</span>
+          <div style="display:flex;gap:4px">
+            ${t.status!=='done'?`<button class="bs bgold" onclick="closeGroupTask('${t.id}')">🔒 إغلاق</button>`:''}
+            <button class="bs br" onclick="delTask('${t.id}');loadGroupTasks()">× حذف</button>
+          </div>
+        </div>
+        <div style="margin-top:8px">${subsHtml}</div>
+      </div>`;
+    }));
+    el('group-tasks-leader-list').innerHTML = rows.join('');
+  } else {
+    if (!el('group-tasks-list')) return;
+    if (!gTasks?.length) { el('group-tasks-list').innerHTML = emptyState('لا توجد مهام جماعية متاحة الآن'); return; }
+    const { data: mySubs } = await sb.from('task_submissions').select('*').eq('user_id', currentUser.id);
+    const subMap = {}; (mySubs||[]).forEach(s => subMap[s.task_id] = s);
+    el('group-tasks-list').innerHTML = gTasks.map(t => {
+      const mySub = subMap[t.id];
+      let actionHtml;
+      if (t.status === 'done') actionHtml = `<span class="my-task-status st-done">🔒 مغلقة</span>`;
+      else if (!mySub) actionHtml = `<button class="bs bg" onclick="submitGroupTask('${t.id}')">🏁 قدّمتها</button>`;
+      else if (mySub.status === 'submitted') actionHtml = `<span class="my-task-status st-active">⏳ قيد المراجعة</span>`;
+      else if (mySub.status === 'approved') actionHtml = `<span class="my-task-status st-done">✅ تمت الموافقة — حصلت +${t.xp} XP</span>`;
+      else actionHtml = `<span class="my-task-status" style="background:rgba(233,75,75,.15);color:var(--red)">❌ مرفوضة</span>`;
+      return `<div class="my-task-card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <div><div class="my-task-title">${t.title}</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px">المكافأة: <b style="color:var(--xp)">+${t.xp} XP</b></div>
+            ${actionHtml}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+async function submitGroupTask(taskId) {
+  if (!confirm('تأكيد أنك أنهيت المهمة الجماعية؟ هيروح طلبك للقائد للمراجعة.')) return;
+  const { error } = await sb.from('task_submissions').insert({ task_id: taskId, user_id: currentUser.id, user_name: userProfile?.full_name || currentUser.email, status: 'submitted' });
+  if (error) { alert('خطأ: ' + error.message); return; }
+  alert('✓ تم إرسال مشاركتك للقائد، بالتوفيق!');
+  loadGroupTasks();
+}
+
+async function approveSubmission(subId, taskId, userId, xp) {
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', userId).single();
+  if (prof && prof.role !== 'leader') {
+    const { newXP, newLevel, newRank, newMaxXP, promoted, rankMsg } = applyXPGain(prof, xp);
+    await sb.from('profiles').update({xp: newXP, level: newLevel, rank: newRank, max_xp: newMaxXP}).eq('id', userId);
+    if (promoted) {
+      const chatKey = [currentUser.id, userId].sort().join('_');
+      await sb.from('messages').insert({ chat_key: chatKey, sender_id: currentUser.id, receiver_id: userId, content: '🎉 تهانينا ' + (prof.full_name||'') + '! لقد ترقيت إلى ' + rankMsg + ' في TAM+ 👑' });
+    }
+  }
+  await sb.from('task_submissions').update({status:'approved'}).eq('id', subId);
+  loadGroupTasks(); loadMembers(); loadDashboard();
+}
+
+async function rejectSubmission(subId, taskId) {
+  await sb.from('task_submissions').update({status:'rejected'}).eq('id', subId);
+  loadGroupTasks();
+}
+
+async function closeGroupTask(taskId) {
+  if (!confirm('إغلاق هذه المهمة الجماعية؟ محدش هيقدر يقدّم فيها بعد كده')) return;
+  await sb.from('tasks').update({status:'done'}).eq('id', taskId);
+  loadGroupTasks();
 }
 
 async function loadMyTasks() {
@@ -1389,15 +1521,50 @@ async function loadMessages(otherUserId) {
     const isMe = m.sender_id === currentUser.id;
     const canEdit = isLeader;
     return `<div style="display:flex;flex-direction:${isMe?'row-reverse':'row'};align-items:flex-end;gap:4px">
-      <div class="msg ${isMe?'sent':'recv'}">${m.content}</div>
+      <div class="msg ${isMe?'sent':'recv'}">${renderMsgBody(m)}</div>
       ${canEdit ? `<div style="display:flex;flex-direction:column;gap:2px">
-        <button onclick="editMsg('${m.id}','${m.content.replace(/'/g,"\'").replace(/"/g,'\"')}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--muted);padding:2px" title="تعديل">✏️</button>
+        <button onclick="editMsg('${m.id}','${(m.content||'').replace(/'/g,"\'").replace(/"/g,'\"')}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--muted);padding:2px" title="تعديل">✏️</button>
         <button onclick="deleteMsg('${m.id}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--red);padding:2px" title="حذف">🗑</button>
       </div>` : ''}
     </div>`;
   }).join('')
     : '<div style="text-align:center;color:var(--muted);font-size:11px;margin:auto;padding:20px">ابدأ المحادثة</div>';
   msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+// ================================================================
+//  MEDIA — رفع وعرض كل أنواع الوسائط (صور/فيديو/صوت/ملفات) في الشات الخاص وشات النخبة
+// ================================================================
+let pendingChatFile = null;
+function onChatFileSelected() {
+  const inp = el('c-file');
+  pendingChatFile = inp.files?.[0] || null;
+  const prev = el('c-file-preview');
+  if (pendingChatFile && prev) { prev.style.display='block'; prev.textContent = '📎 ' + pendingChatFile.name + ' — هيتبعت مع الرسالة الجاية'; }
+}
+
+async function uploadChatMedia(file, folder) {
+  const ext = file.name.split('.').pop();
+  const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const { error } = await sb.storage.from('chat-media').upload(path, file);
+  if (error) { alert('فشل رفع الملف: ' + error.message); return null; }
+  const { data } = sb.storage.from('chat-media').getPublicUrl(path);
+  let mediaType = 'file';
+  if (file.type.startsWith('image/')) mediaType = 'image';
+  else if (file.type.startsWith('video/')) mediaType = 'video';
+  else if (file.type.startsWith('audio/')) mediaType = 'audio';
+  return { url: data.publicUrl, type: mediaType };
+}
+
+function renderMsgBody(m) {
+  let html = m.content ? `<div>${m.content}</div>` : '';
+  if (m.media_url) {
+    if (m.media_type === 'image') html += `<img src="${m.media_url}" style="max-width:220px;border-radius:8px;margin-top:4px;display:block">`;
+    else if (m.media_type === 'video') html += `<video src="${m.media_url}" controls style="max-width:220px;border-radius:8px;margin-top:4px;display:block"></video>`;
+    else if (m.media_type === 'audio') html += `<audio src="${m.media_url}" controls style="margin-top:4px;max-width:220px"></audio>`;
+    else html += `<a href="${m.media_url}" target="_blank" style="color:inherit;text-decoration:underline;font-size:11px;display:block;margin-top:4px">📎 فتح الملف المرفق</a>`;
+  }
+  return html;
 }
 
 async function editMsg(id, oldContent) {
@@ -1417,10 +1584,18 @@ async function sendMsg() {
   if (!currentChatUserId) { alert('اختر محادثة أولاً'); return; }
   const inp = el('c-inp');
   const txt = inp.value.trim();
-  if (!txt) return;
+  if (!txt && !pendingChatFile) return;
   inp.value = '';
   const chatKey = getChatKey(currentUser.id, currentChatUserId);
-  await sb.from('messages').insert({ chat_key: chatKey, sender_id: currentUser.id, receiver_id: currentChatUserId, content: txt });
+  const row = { chat_key: chatKey, sender_id: currentUser.id, receiver_id: currentChatUserId, content: txt };
+  if (pendingChatFile) {
+    const media = await uploadChatMedia(pendingChatFile, chatKey);
+    if (media) { row.media_url = media.url; row.media_type = media.type; }
+    pendingChatFile = null;
+    el('c-file').value = '';
+    if (el('c-file-preview')) el('c-file-preview').style.display = 'none';
+  }
+  await sb.from('messages').insert(row);
   await loadMessages(currentChatUserId);
 }
 
@@ -1697,11 +1872,12 @@ async function loadProfile() {
 //  RANKS
 // ================================================================
 function renderRanks() {
+  if (el('rk-l1')) { el('rk-l1').textContent = LEVEL_XP[0]; el('rk-l2').textContent = LEVEL_XP[1]; el('rk-l3').textContent = LEVEL_XP[2]; }
   el('rank-grid').innerHTML = RANKS.map(r => `
     <div class="rank-card ${r.m?'mc':''}">
       <div class="rank-icon">${r.i}</div>
       <div class="rank-name" style="color:${r.c}">${r.n}</div>
-      ${r.max?'<div class="rank-xp" style="color:#FF00FF">الرتبة الأسطورية ✨</div>':`<div class="rank-xp">50 → 75 → 120 XP</div><div class="rank-levels">${[0,1,2].map(()=>'<div class="lvl-dot"></div>').join('')}</div>`}
+      ${r.max?'<div class="rank-xp" style="color:#FF00FF">الرتبة الأسطورية ✨</div>':`<div class="rank-xp">${LEVEL_XP[0]} → ${LEVEL_XP[1]} → ${LEVEL_XP[2]} XP</div><div class="rank-levels">${[0,1,2].map(()=>'<div class="lvl-dot"></div>').join('')}</div>`}
     </div>`).join('');
 }
 
@@ -1715,9 +1891,15 @@ function showAddTask() {
   // القائد مش في قائمة المكلفين بالمهام
   sb.from('profiles').select('id,full_name,email').eq('status','active').neq('email', LEADER_EMAIL).then(({data:members}) => {
     showModal(`<div class="modal-title">📋 مهمة جديدة</div>
+      <div class="form-group"><label class="form-label">نوع المهمة</label>
+        <select class="inp" id="t-type" onchange="toggleTaskType()">
+          <option value="individual">👤 فردية — لعضو واحد محدد</option>
+          <option value="group">👥 جماعية — يشوفها الكل ويتسابقوا عليها</option>
+        </select>
+      </div>
       <div class="form-group"><label class="form-label">عنوان المهمة</label><input class="inp" id="t-t" placeholder="وصف المهمة..."></div>
       <div class="form-row">
-        <div><label class="form-label">العضو المكلّف</label>
+        <div id="t-a-wrap"><label class="form-label">العضو المكلّف</label>
           <select class="inp" id="t-a">${(members||[]).map(m=>`<option value="${m.id}">${m.full_name||m.email}</option>`).join('')}</select></div>
         <div><label class="form-label">XP المكافأة</label><input class="inp" id="t-x" type="number" value="20" min="1"></div>
       </div>
@@ -1725,13 +1907,27 @@ function showAddTask() {
   });
 }
 
+function toggleTaskType() {
+  const isGroup = el('t-type')?.value === 'group';
+  const wrap = el('t-a-wrap');
+  if (wrap) wrap.style.display = isGroup ? 'none' : '';
+}
+
 async function addTask() {
-  const title = v('t-t'), assigneeId = el('t-a')?.value, xp = parseInt(v('t-x'))||20;
-  if (!title) { alert('يرجى إدخال عنوان المهمة'); return;  }
-  const { data: assignee } = await sb.from('profiles').select('full_name').eq('id', assigneeId).single();
-  const { error } = await sb.from('tasks').insert({ title, assignee_id: assigneeId, assignee_name: assignee?.full_name||'', xp, status:'pending' });
-  if (error) { alert('خطأ في إضافة المهمة: ' + error.message); return; }
-  closeModal(); loadTasks(); loadDashboard();
+  const title = v('t-t'), type = el('t-type')?.value || 'individual', xp = parseInt(v('t-x'))||20;
+  if (!title) { alert('يرجى إدخال عنوان المهمة'); return; }
+  if (type === 'group') {
+    // مهمة جماعية — تظهر لكل الأعضاء، بدون تكليف شخص بعينه، وتبدأ نشطة فوراً
+    const { error } = await sb.from('tasks').insert({ title, assignee_id: null, assignee_name: '👥 مهمة جماعية', xp, status:'active', type:'group' });
+    if (error) { alert('خطأ في إضافة المهمة: ' + error.message); return; }
+  } else {
+    const assigneeId = el('t-a')?.value;
+    const { data: assignee } = await sb.from('profiles').select('full_name').eq('id', assigneeId).single();
+    // تبدأ المهمة الفردية "نشطة" مباشرة عشان العضو يقدر يشتغل عليها ويقفلها بنفسه من غير أي تدخل تاني من القائد
+    const { error } = await sb.from('tasks').insert({ title, assignee_id: assigneeId, assignee_name: assignee?.full_name||'', xp, status:'active', type:'individual' });
+    if (error) { alert('خطأ في إضافة المهمة: ' + error.message); return; }
+  }
+  closeModal(); loadTasks(); loadDashboard(); loadGroupTasks();
 }
 
 function showAddNews() {
@@ -1837,27 +2033,29 @@ async function loadRoomChat() {
   if (!roomArea) return;
   roomArea.innerHTML += `
     <div style="margin-top:16px;background:var(--card);border:1px solid var(--gold)33;border-radius:13px;padding:14px">
-      <div class="sec-title" style="color:var(--gold);margin-bottom:10px">💬 شات الغرفة الخاصة 👑</div>
+      <div class="sec-title" style="color:var(--gold);margin-bottom:10px">💬 شات الغرفة الخاصة 👑 <span style="font-size:9px;color:var(--green)">🔒 مشفّرة بصلاحيات — أعضاء الغرفة والقائد فقط</span></div>
       <div id="room-chat-msgs" style="height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px">
         <div style="text-align:center;color:var(--muted);font-size:11px">جاري تحميل الرسائل...</div>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="file" id="room-file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip" style="display:none" onchange="onRoomFileSelected()">
+        <button class="send-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="document.getElementById('room-file').click()" title="إرفاق ملف/صورة/فيديو"><i class="ti ti-paperclip" style="font-size:14px;color:var(--muted)"></i></button>
         <input class="inp" id="room-msg-inp" placeholder="رسالة للغرفة..." style="flex:1" onkeypress="if(event.key==='Enter')sendRoomMsg()">
         <button class="send-btn" onclick="sendRoomMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
       </div>
+      <div id="room-file-preview" style="display:none;padding:4px 2px;font-size:10px;color:var(--gold)"></div>
     </div>`;
   await loadRoomMessages();
-  // Realtime للشات
-  sb.channel('room-chat-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `chat_key=eq.room-elite` }, () => {
+  // Realtime على جدول elite_messages المخصص والمحمي بـ RLS بدل استغلال جدول الرسائل العام
+  sb.channel('elite-chat-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'elite_messages' }, () => {
       loadRoomMessages();
     }).subscribe();
 }
 
 async function loadRoomMessages() {
-  const { data: msgs, error } = await sb.from('messages')
-    .select('*, profiles!messages_sender_id_fkey(full_name,color)')
-    .eq('chat_key', 'room-elite')
+  const { data: msgs, error } = await sb.from('elite_messages')
+    .select('*, profiles!elite_messages_sender_id_fkey(full_name,color)')
     .order('created_at', {ascending: true})
     .limit(50);
   if (error) { console.log('room chat error:', error.message); }
@@ -1870,7 +2068,7 @@ async function loadRoomMessages() {
       <div>
         <div style="font-size:9px;color:var(--muted);margin-bottom:2px;text-align:${isMe?'left':'right'}">${m.profiles?.full_name||'عضو'}</div>
         <div style="display:flex;align-items:center;gap:4px;flex-direction:${isMe?'row-reverse':'row'}">
-          <div style="max-width:200px;background:${isMe?'linear-gradient(135deg,var(--blue),#1a7aad)':'var(--surface)'};border:1px solid var(--border);border-radius:${isMe?'12px 2px 12px 12px':'2px 12px 12px 12px'};padding:7px 10px;font-size:11px">${m.content}</div>
+          <div style="max-width:220px;background:${isMe?'linear-gradient(135deg,var(--blue),#1a7aad)':'var(--surface)'};border:1px solid var(--border);border-radius:${isMe?'12px 2px 12px 12px':'2px 12px 12px 12px'};padding:7px 10px;font-size:11px">${renderMsgBody(m)}</div>
           ${isLeader?`<button onclick="delRoomMsg('${m.id}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--red);opacity:.5;padding:2px" title="حذف">🗑</button>`:''}
         </div>
       </div>
@@ -1880,24 +2078,31 @@ async function loadRoomMessages() {
 }
 
 async function delRoomMsg(id) {
-  await sb.from('messages').delete().eq('id', id);
+  await sb.from('elite_messages').delete().eq('id', id);
   loadRoomMessages();
+}
+
+let pendingRoomFile = null;
+function onRoomFileSelected() {
+  const inp = el('room-file');
+  pendingRoomFile = inp.files?.[0] || null;
+  const prev = el('room-file-preview');
+  if (pendingRoomFile && prev) { prev.style.display='block'; prev.textContent = '📎 ' + pendingRoomFile.name + ' — هيتبعت مع الرسالة الجاية'; }
 }
 
 async function sendRoomMsg() {
   const content = v('room-msg-inp');
-  if (!content.trim()) return;
-  // chat_key ثابت للغرفة — receiver_id = sender_id عشان الـ RLS يسمح
-  // لكن نحتاج policy خاصة للغرفة — نستخدم القائد كـ receiver
-  const { data: leaderData } = await sb.from('profiles').select('id').eq('email', LEADER_EMAIL).single();
-  const receiverId = leaderData?.id || currentUser.id;
-  const { error } = await sb.from('messages').insert({
-    chat_key: 'room-elite',
-    sender_id: currentUser.id,
-    receiver_id: receiverId,
-    content: content.trim()
-  });
-  if (error) { console.log('send room msg error:', error.message); return; }
+  if (!content.trim() && !pendingRoomFile) return;
+  const row = { sender_id: currentUser.id, sender_name: userProfile?.full_name || currentUser.email, content: content.trim() };
+  if (pendingRoomFile) {
+    const media = await uploadChatMedia(pendingRoomFile, 'room-elite');
+    if (media) { row.media_url = media.url; row.media_type = media.type; }
+    pendingRoomFile = null;
+    el('room-file').value = '';
+    if (el('room-file-preview')) el('room-file-preview').style.display = 'none';
+  }
+  const { error } = await sb.from('elite_messages').insert(row);
+  if (error) { console.log('send room msg error:', error.message); alert('لازم تكون عضو في غرفة النخبة عشان تبعت رسالة'); return; }
   el('room-msg-inp').value = '';
   loadRoomMessages();
 }
@@ -1958,7 +2163,6 @@ async function doPenalty(id, curXP, maxXP, curLevel, curRank) {
   let newLevel = curLevel;
   let newRank = curRank;
   let newMaxXP = maxXP;
-  const xpPerLevel = [50, 75, 120];
   let penaltyMsg = '';
 
   if (type === 'rank') {
@@ -1968,18 +2172,19 @@ async function doPenalty(id, curXP, maxXP, curLevel, curRank) {
       newRank = RANKS[ri - 1].n;
       newLevel = 3;
       newXP = 0;
-      newMaxXP = 120;
+      newMaxXP = LEVEL_XP[2];
       penaltyMsg = `تم تخفيض رتبته إلى ${newRank}`;
     } else {
       // Member مش ممكن ينزل أكتر
       newLevel = 1;
       newXP = 0;
+      newMaxXP = LEVEL_XP[0];
       penaltyMsg = 'تم خصم XP (أدنى مستوى)';
     }
   } else if (type === 'level' && newXP === 0 && curLevel > 1) {
     // تخفيض مستوى
     newLevel = curLevel - 1;
-    newMaxXP = xpPerLevel[newLevel - 1] || 50;
+    newMaxXP = LEVEL_XP[newLevel - 1] || LEVEL_XP[0];
     newXP = Math.floor(newMaxXP * 0.5); // يبدأ من نص المستوى السابق
     penaltyMsg = `تم تخفيض المستوى إلى ${newLevel}`;
   } else {
@@ -2024,15 +2229,21 @@ function promoteModal(id, name, rank, level, xp, maxXp) {
 async function doPromote(id, curXP, maxXP, curLevel) {
   const addXP = parseInt(v('pr-x'))||0;
   const newRank = el('pr-r').value;
-  const xpPerLevel = [50, 75, 120];
-  let newXP = Math.min(maxXP, curXP + addXP);
-  let newLevel = curLevel;
-  let newMaxXP = maxXP;
-  if (newXP >= maxXP && newLevel < 3) { newLevel++; newXP = 0; newMaxXP = xpPerLevel[newLevel-1]||120; }
-  // لو تغيرت الرتبة — نرجّع المستوى
+  // إضافة XP بتترقّي مستوى فقط (لغاية L3) — الترقية للرتبة التالية تبقى قرار القائد اليدوي من القائمة
+  let xp = curXP + addXP, level = curLevel, maxXp = maxXP;
+  while (xp >= maxXp && level < 3) {
+    xp -= maxXp;
+    level++;
+    maxXp = LEVEL_XP[level - 1] || LEVEL_XP[2];
+  }
+  if (xp >= maxXp) xp = maxXp; // وصل لسقف المستوى الأخير — ينتظر ترقية الرتبة يدوياً
+  let finalXP = xp, finalLevel = level, finalMaxXP = maxXp;
+  // لو القائد اختار رتبة مختلفة عن الحالية — نرجّع المستوى لأول درجة في الرتبة الجديدة
   const { data: curProf } = await sb.from('profiles').select('rank').eq('id',id).single();
-  if (curProf && curProf.rank !== newRank) { newLevel = 1; newXP = 0; newMaxXP = 50; }
-  await sb.from('profiles').update({rank: newRank, xp: newXP, level: newLevel, max_xp: newMaxXP}).eq('id', id);
+  if (curProf && curProf.rank !== newRank) {
+    finalLevel = 1; finalXP = 0; finalMaxXP = LEVEL_XP[0];
+  }
+  await sb.from('profiles').update({rank: newRank, xp: finalXP, level: finalLevel, max_xp: finalMaxXP}).eq('id', id);
   closeModal(); loadMembers(); loadDashboard();
   alert(`🎉 تمت ترقية العضو!\nالرتبة: ${newRank}`);
 }
@@ -2078,7 +2289,14 @@ async function saveXP() {
   await sb.from('settings').upsert({key:'xp_l1', value: String(x1)});
   await sb.from('settings').upsert({key:'xp_l2', value: String(x2)});
   await sb.from('settings').upsert({key:'xp_l3', value: String(x3)});
+  LEVEL_XP = [x1, x2, x3]; // تفعيل القيم الجديدة فوراً في كل حسابات الـ XP بالتطبيق
   alert(`✅ تم حفظ إعدادات XP\nL1: ${x1} | L2: ${x2} | L3: ${x3}`);
+}
+
+function loadXPInputs() {
+  if (el('xp1')) el('xp1').value = LEVEL_XP[0];
+  if (el('xp2')) el('xp2').value = LEVEL_XP[1];
+  if (el('xp3')) el('xp3').value = LEVEL_XP[2];
 }
 
 async function loadSettingsRoomCode() {
@@ -2202,8 +2420,10 @@ window.addEventListener('load', () => {
        role TEXT DEFAULT 'member',
        created_at TIMESTAMPTZ DEFAULT NOW()
      );
+     -- يمنع أي اسمين متطابقين (بتجاهل حالة الأحرف) على مستوى قاعدة البيانات كطبقة حماية إضافية فوق فحص الكود
+     CREATE UNIQUE INDEX profiles_full_name_unique_idx ON profiles (LOWER(full_name));
 
-     -- جدول المهام
+     -- جدول المهام (type: individual = مهمة فردية لعضو واحد / group = مهمة جماعية للكل)
      CREATE TABLE tasks (
        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
        title TEXT NOT NULL,
@@ -2211,6 +2431,17 @@ window.addEventListener('load', () => {
        assignee_name TEXT,
        xp INTEGER DEFAULT 20,
        status TEXT DEFAULT 'pending',
+       type TEXT DEFAULT 'individual',
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
+     -- جدول مشاركات المهام الجماعية (كل عضو يقدّم مشاركته والقائد يقبل أو يرفض)
+     CREATE TABLE task_submissions (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+       user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+       user_name TEXT,
+       status TEXT DEFAULT 'submitted',
        created_at TIMESTAMPTZ DEFAULT NOW()
      );
 
@@ -2224,16 +2455,29 @@ window.addEventListener('load', () => {
        created_at TIMESTAMPTZ DEFAULT NOW()
      );
 
-     -- جدول الرسائل
+     -- جدول الرسائل (الشات الخاص بين القائد وكل عضو) — media_url/media_type لإرسال كل أنواع الوسائط
      CREATE TABLE messages (
        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
        chat_key TEXT NOT NULL,
        sender_id UUID REFERENCES profiles(id),
        receiver_id UUID REFERENCES profiles(id),
-       content TEXT NOT NULL,
+       content TEXT,
+       media_url TEXT,
+       media_type TEXT,
        created_at TIMESTAMPTZ DEFAULT NOW()
      );
      CREATE INDEX ON messages(chat_key);
+
+     -- جدول شات غرفة النخبة المستقل (منفصل تماماً عن جدول الرسائل العام لأمان وخصوصية أعلى)
+     CREATE TABLE elite_messages (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       sender_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+       sender_name TEXT,
+       content TEXT,
+       media_url TEXT,
+       media_type TEXT,
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
 
      -- جدول القوانين
      CREATE TABLE rules (
@@ -2252,14 +2496,17 @@ window.addEventListener('load', () => {
        created_at TIMESTAMPTZ DEFAULT NOW()
      );
 
-     -- جدول الإعدادات
+     -- جدول الإعدادات (فيه كمان xp_l1/xp_l2/xp_l3 اللي بيتحكموا في عتبات المستويات 50/75/120)
      CREATE TABLE settings (
        key TEXT PRIMARY KEY,
        value TEXT
      );
      INSERT INTO settings VALUES ('room_code', 'TAM-AX-1234');
+     INSERT INTO settings VALUES ('xp_l1', '50');
+     INSERT INTO settings VALUES ('xp_l2', '75');
+     INSERT INTO settings VALUES ('xp_l3', '120');
 
-     -- جدول أعضاء الغرفة
+     -- جدول أعضاء الغرفة (غرفة النخبة)
      CREATE TABLE room_members (
        user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
        joined_at TIMESTAMPTZ DEFAULT NOW()
@@ -2268,8 +2515,10 @@ window.addEventListener('load', () => {
      -- تفعيل RLS
      ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
      ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE task_submissions ENABLE ROW LEVEL SECURITY;
      ALTER TABLE news ENABLE ROW LEVEL SECURITY;
      ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE elite_messages ENABLE ROW LEVEL SECURITY;
      ALTER TABLE rules ENABLE ROW LEVEL SECURITY;
      ALTER TABLE bands ENABLE ROW LEVEL SECURITY;
      ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
@@ -2280,12 +2529,52 @@ window.addEventListener('load', () => {
      CREATE POLICY "user can update own" ON profiles FOR UPDATE USING (auth.uid() = id);
      CREATE POLICY "user can insert own" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
      CREATE POLICY "leader can update any" ON profiles FOR UPDATE USING (true);
-     CREATE POLICY "everyone reads tasks" ON tasks FOR SELECT USING (true);
-     CREATE POLICY "members can update own tasks" ON tasks FOR UPDATE USING (auth.uid() = assignee_id);
+
+     -- المهام: خصوصية — كل عضو يقرأ مهامه الفردية بس + كل المهام الجماعية، والقائد يقرأ كل حاجة
+     CREATE POLICY "read own or group tasks or leader" ON tasks FOR SELECT USING (
+       auth.uid() = assignee_id
+       OR type = 'group'
+       OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+     CREATE POLICY "leader manages tasks" ON tasks FOR INSERT WITH CHECK (
+       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+     CREATE POLICY "leader deletes tasks" ON tasks FOR DELETE USING (
+       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+     CREATE POLICY "members can update own tasks" ON tasks FOR UPDATE USING (
+       auth.uid() = assignee_id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+
+     -- مشاركات المهام الجماعية
+     CREATE POLICY "read own submissions or leader" ON task_submissions FOR SELECT USING (
+       auth.uid() = user_id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+     CREATE POLICY "submit own participation" ON task_submissions FOR INSERT WITH CHECK (auth.uid() = user_id);
+     CREATE POLICY "leader reviews submissions" ON task_submissions FOR UPDATE USING (
+       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+
      CREATE POLICY "everyone reads news" ON news FOR SELECT USING (true);
-     -- الرسائل: كل من له علاقة يقدر يقرأ (يشمل شات الغرفة حيث sender=receiver)
+     -- الرسائل الخاصة: كل من له علاقة يقدر يقرأ (القائد وصاحب الرسالة فقط)
      CREATE POLICY "read own messages" ON messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
      CREATE POLICY "send messages" ON messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+
+     -- شات غرفة النخبة: خصوصية وأمان أعلى — القراءة والإرسال مسموح فقط لأعضاء الغرفة (room_members) أو القائد
+     CREATE POLICY "elite read for room members or leader" ON elite_messages FOR SELECT USING (
+       EXISTS (SELECT 1 FROM room_members WHERE user_id = auth.uid())
+       OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+     CREATE POLICY "elite send for room members or leader" ON elite_messages FOR INSERT WITH CHECK (
+       auth.uid() = sender_id AND (
+         EXISTS (SELECT 1 FROM room_members WHERE user_id = auth.uid())
+         OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+       )
+     );
+     CREATE POLICY "leader deletes elite messages" ON elite_messages FOR DELETE USING (
+       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+
      CREATE POLICY "everyone reads rules" ON rules FOR SELECT USING (true);
      CREATE POLICY "everyone reads bands" ON bands FOR SELECT USING (true);
      CREATE POLICY "read settings" ON settings FOR SELECT USING (true);
@@ -2295,10 +2584,18 @@ window.addEventListener('load', () => {
      CREATE POLICY "join room" ON room_members FOR INSERT WITH CHECK (auth.uid() = user_id);
      CREATE POLICY "leave room" ON room_members FOR DELETE USING (auth.uid() = user_id OR true);
 
-     -- تفعيل Realtime على جدول الرسائل
-     -- Authentication → Policies → Enable Email
-     -- Supabase Dashboard → Database → Replication → messages table
+     -- تفعيل Realtime على الجداول المطلوبة من Database → Replication:
+     -- messages / elite_messages / tasks / task_submissions / news / profiles / bands
 
-     ================================================================ -->
+     -- ================================================================
+     -- 📎 إعداد تخزين الوسائط (صور/فيديو/صوت/ملفات) في الشات الخاص وشات النخبة
+     -- ================================================================
+     -- من Supabase Dashboard → Storage → Create a new bucket
+     -- اسم الـ bucket: chat-media   |   Public bucket: ✓ مفعّل
+     -- بعد إنشاء الـ bucket، روح Storage → Policies وضيف:
+     --   INSERT: WITH CHECK (auth.role() = 'authenticated')
+     --   SELECT: USING (true)  -- عشان أي حد معاه اللينك يقدر يفتح الميديا بعد ما اتبعتله في شات خاص بيه
+     -- ================================================================
+
 </body>
 </html>
