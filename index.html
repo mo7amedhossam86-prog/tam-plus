@@ -641,6 +641,7 @@ let currentUser = null;
 let userProfile = null;
 let isLeader = false;
 let currentChatUserId = null;
+let canAccessEliteRoom = false; // القائد دايماً مشرف على الغرفة تلقائياً بدون ما يتضاف كعضو في room_members
 let chatSubscription = null;
 
 const RANKS = [
@@ -1103,6 +1104,21 @@ function startRealtimeSubscriptions() {
         loadRoomMessages();
         if (payload.new?.sender_id !== currentUser.id) addMemberNotif('💬 رسالة جديدة في غرفة النخبة');
       }).subscribe();
+    // أي تغيير في أي بروفايل (صورة/إيموجي غيّره أي عضو أو القائد) ينعكس فوراً لكل الأعضاء
+    // بدل ما يفضل مخفي لحد ما حد يعمل refresh يدوي للصفحة
+    sb.channel("any-profile-avatar-changes")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, (payload) => {
+        if (payload.new?.id === currentUser.id) {
+          userProfile = payload.new;
+          renderTopbar();
+          if (document.getElementById('page-profile')?.classList.contains('active')) loadProfile();
+        }
+        if (currentChatUserId && payload.new?.id === currentChatUserId) {
+          const cav = el('c-av');
+          if (cav) cav.innerHTML = avatarHTML(payload.new);
+        }
+        if (document.getElementById('room-chat-msgs')) loadRoomMessages();
+      }).subscribe();
   }
 }
 
@@ -1312,7 +1328,21 @@ async function memberCompleteTask(taskId, xp) {
   if (prof) {
     const { newXP, newLevel, newRank, newMaxXP, promoted, rankMsg } = applyXPGain(prof, xp);
     await sb.from('profiles').update({xp: newXP, level: newLevel, rank: newRank, max_xp: newMaxXP}).eq('id', currentUser.id);
-    if (promoted) alert('🎉 تهانينا! ترقيت إلى ' + rankMsg);
+    if (promoted) {
+      // ابعت تهنئة في الشات الخاص بتاع العضو (نفس اللي بيحصل لما القائد هو اللي بيوافق على المهمة)
+      const { data: leader } = await sb.from('profiles').select('id').eq('email', LEADER_EMAIL).single();
+      if (leader) {
+        // sender_id لازم يكون هو العضو نفسه (auth.uid() الحالي) عشان سياسة الحماية RLS بتسمح بس لصاحب الرسالة إنه يبعتها
+        const chatKey = [leader.id, currentUser.id].sort().join('_');
+        await sb.from('messages').insert({
+          chat_key: chatKey,
+          sender_id: currentUser.id,
+          receiver_id: leader.id,
+          content: '🎉 تهانينا ' + (prof.full_name||'') + '! لقد ترقيت إلى ' + rankMsg + ' في TAM+ 👑'
+        });
+      }
+      alert('🎉 تهانينا! ترقيت إلى ' + rankMsg);
+    }
     else alert('✅ أحسنت! حصلت على ' + xp + ' XP');
   }
   loadMyTasks(); loadTasks();
@@ -1518,7 +1548,7 @@ async function openChatWith(userId, name, color) {
   el('c-av').style.background = `linear-gradient(135deg,${color},${color}88)`;
   el('c-av').style.overflow = 'hidden';
   el('c-name').textContent = name;
-  sb.from('profiles').select('full_name,avatar_type,avatar_value,avatar_status').eq('id', userId).single()
+  sb.from('profiles').select('full_name,role,avatar_type,avatar_value,avatar_status').eq('id', userId).single()
     .then(({data}) => { if (data && currentChatUserId === userId) el('c-av').innerHTML = avatarHTML(data); });
   
   // Unsubscribe old
@@ -1653,8 +1683,9 @@ async function loadRoom() {
   const { data: settings } = await sb.from('settings').select('value').eq('key','room_code').single();
   const roomCode = settings?.value || 'TAM-ΩX-0000';
 
+  canAccessEliteRoom = isLeader; // هيتحدث تحت لو عضو ومسجل في الغرفة
   if (isLeader) {
-    // القائد يشوف الكود دايماً مع أزرار التحكم
+    // القائد يشوف الكود دايماً مع أزرار التحكم — وهو دايماً مشرف على الغرفة تلقائياً بدون أي إضافة يدوية
     el('room-hero-area').innerHTML = `
       <div class="room-hero">
         <div style="display:flex;align-items:center;gap:11px;margin-bottom:11px">
@@ -1678,6 +1709,7 @@ async function loadRoom() {
     // العضو — نتحقق أولاً هل هو في الغرفة
     const { data: roomMember } = await sb.from('room_members').select('*').eq('user_id', currentUser.id).single();
 
+    canAccessEliteRoom = !!roomMember;
     if (roomMember) {
       // ✅ في الغرفة — اخفي كل حاجة متعلقة بالكود
       el('room-hero-area').innerHTML = `
@@ -1715,9 +1747,23 @@ async function loadRoom() {
     }
   }
 
-  // قائمة أعضاء الغرفة
+  // لو مش من حقه يشوف شات الغرفة (مش عضو نخبة ومش القائد) — نتأكد إن أي نسخة قديمة من الشات اتشالت
+  if (!canAccessEliteRoom) {
+    document.getElementById('room-chat-box')?.remove();
+  }
+
+  // قائمة أعضاء الغرفة — القائد بيظهر دايماً كمشرف تلقائي فوق القائمة (مش محتاج يتضاف كعضو)
   const { data: roomMembers } = await sb.from('room_members').select('*, profiles(full_name, rank, color)');
-  el('room-list').innerHTML = roomMembers?.length ? roomMembers.map(rm => `
+  const leaderRow = `
+    <div class="t-row" style="grid-template-columns:2fr 1fr 1fr">
+      <div class="mn-cell">
+        <div class="m-av" style="background:rgba(255,179,0,.2);color:var(--gold)">👑</div>
+        <span>القائد الأعلى</span>
+      </div>
+      <span class="r-badge" style="background:rgba(255,179,0,.12);color:var(--gold)">مشرف دائم — بدون إضافة</span>
+      <span></span>
+    </div>`;
+  const membersRows = roomMembers?.length ? roomMembers.map(rm => `
     <div class="t-row" style="grid-template-columns:2fr 1fr 1fr">
       <div class="mn-cell">
         <div class="m-av" style="background:${rm.profiles?.color||'#29ABE2'}22;color:${rm.profiles?.color||'#29ABE2'}">${(rm.profiles?.full_name||'?')[0]}</div>
@@ -1725,7 +1771,8 @@ async function loadRoom() {
       </div>
       <span class="r-badge" style="background:rgba(255,179,0,.12);color:var(--gold)">مساعد مختار</span>
       ${isLeader?`<button class="bs br" onclick="removeFromRoom('${rm.user_id}')">إزالة</button>`:'<span></span>'}
-    </div>`).join('') : '<div class="empty-state"><i class="ti ti-shield"></i><p>الغرفة فارغة</p></div>';
+    </div>`).join('') : '';
+  el('room-list').innerHTML = leaderRow + membersRows;
 }
 
 async function genCode() {
@@ -1931,6 +1978,10 @@ function avatarHTML(p, big) {
   }
   if (p?.avatar_type === 'emoji' && p?.avatar_value) {
     return `<span style="font-size:${fontSize};line-height:1">${p.avatar_value}</span>`;
+  }
+  // القائد الافتراضي: لو مختارش صورة/إيموجي بنفسه، يظهر تاجه 👑 بدل الحرف الأول
+  if (p?.role === 'leader') {
+    return `<span style="font-size:${fontSize};line-height:1">👑</span>`;
   }
   return initial;
 }
@@ -2293,11 +2344,13 @@ async function addRoom() {
 }
 
 async function loadRoomChat() {
+  // حماية إضافية على مستوى الواجهة: العضو اللي مش في الغرفة (والقائد فقط) منعرضلوش الشات أصلاً
+  if (!canAccessEliteRoom) { document.getElementById('room-chat-box')?.remove(); return; }
   if (document.getElementById('room-chat-msgs')) return;
   const roomArea = el('room-join-area') || el('page-room');
   if (!roomArea) return;
   roomArea.innerHTML += `
-    <div style="margin-top:16px;background:var(--card);border:1px solid var(--gold)33;border-radius:13px;padding:14px">
+    <div id="room-chat-box" style="margin-top:16px;background:var(--card);border:1px solid var(--gold)33;border-radius:13px;padding:14px">
       <div class="sec-title" style="color:var(--gold);margin-bottom:10px">💬 شات الغرفة الخاصة 👑 <span style="font-size:9px;color:var(--green)">🔒 مشفّرة بصلاحيات — أعضاء الغرفة والقائد فقط</span></div>
       <div id="room-chat-msgs" style="height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px">
         <div style="text-align:center;color:var(--muted);font-size:11px">جاري تحميل الرسائل...</div>
@@ -2326,7 +2379,7 @@ async function loadRoomChat() {
 
 async function loadRoomMessages() {
   const { data: msgs, error } = await sb.from('elite_messages')
-    .select('*, profiles!elite_messages_sender_id_fkey(full_name,color,avatar_type,avatar_value,avatar_status)')
+    .select('*, profiles!elite_messages_sender_id_fkey(full_name,color,role,avatar_type,avatar_value,avatar_status)')
     .order('created_at', {ascending: true})
     .limit(50);
   if (error) { console.log('room chat error:', error.message); }
@@ -2514,23 +2567,38 @@ function promoteModal(id, name, rank, level, xp, maxXp) {
 async function doPromote(id, curXP, maxXP, curLevel) {
   const addXP = parseInt(v('pr-x'))||0;
   const newRank = el('pr-r').value;
-  // إضافة XP بتترقّي مستوى فقط (لغاية L3) — الترقية للرتبة التالية تبقى قرار القائد اليدوي من القائمة
-  let xp = curXP + addXP, level = curLevel, maxXp = maxXP;
-  while (xp >= maxXp && level < 3) {
-    xp -= maxXp;
-    level++;
-    maxXp = LEVEL_XP[level - 1] || LEVEL_XP[2];
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', id).single();
+  if (!prof) { closeModal(); return; }
+
+  let finalXP, finalLevel, finalRank, finalMaxXP, promoted, rankMsg;
+
+  if (newRank !== prof.rank) {
+    // القائد اختار رتبة مختلفة يدويًا (تخطي رتب) — الرتبة الجديدة تبدأ من المستوى الأول
+    finalRank = newRank; finalLevel = 1; finalMaxXP = LEVEL_XP[0];
+    finalXP = Math.min(Math.max(0, addXP), finalMaxXP);
+    promoted = true;
+    rankMsg = 'رتبة ' + newRank;
+  } else {
+    // نفس الرتبة — نضيف الـ XP ونسيب المحرك الموحّد applyXPGain يحسب تلقائيًا أي ترقية مستوى
+    // أو حتى ترقية رتبة كاملة (زي الوصول من Member إلى Master عند 120 نقطة) في نفس الخطوة
+    const result = applyXPGain(prof, addXP);
+    finalXP = result.newXP; finalLevel = result.newLevel; finalRank = result.newRank;
+    finalMaxXP = result.newMaxXP; promoted = result.promoted; rankMsg = result.rankMsg;
   }
-  if (xp >= maxXp) xp = maxXp; // وصل لسقف المستوى الأخير — ينتظر ترقية الرتبة يدوياً
-  let finalXP = xp, finalLevel = level, finalMaxXP = maxXp;
-  // لو القائد اختار رتبة مختلفة عن الحالية — نرجّع المستوى لأول درجة في الرتبة الجديدة
-  const { data: curProf } = await sb.from('profiles').select('rank').eq('id',id).single();
-  if (curProf && curProf.rank !== newRank) {
-    finalLevel = 1; finalXP = 0; finalMaxXP = LEVEL_XP[0];
+
+  await sb.from('profiles').update({ rank: finalRank, xp: finalXP, level: finalLevel, max_xp: finalMaxXP }).eq('id', id);
+
+  if (promoted) {
+    // ابعت تهنئة في الشات الخاص بتاع العضو
+    const chatKey = [currentUser.id, id].sort().join('_');
+    await sb.from('messages').insert({
+      chat_key: chatKey, sender_id: currentUser.id, receiver_id: id,
+      content: '🎉 تهانينا ' + (prof.full_name||'') + '! لقد ترقيت إلى ' + rankMsg + ' في TAM+ 👑'
+    });
   }
-  await sb.from('profiles').update({rank: newRank, xp: finalXP, level: finalLevel, max_xp: finalMaxXP}).eq('id', id);
+
   closeModal(); loadMembers(); loadDashboard();
-  alert(`🎉 تمت ترقية العضو!\nالرتبة: ${newRank}`);
+  alert(promoted ? `🎉 تمت ترقية العضو!\nالرتبة: ${finalRank}` : '✓ تم إضافة XP للعضو');
 }
 
 // ================================================================
