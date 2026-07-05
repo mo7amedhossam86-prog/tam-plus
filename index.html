@@ -458,6 +458,15 @@ select.inp{cursor:pointer}
         <div id="group-tasks-list"></div>
       </div>
 
+      <!-- ROSTER (members: read-only view of the rest of the team, no actions) -->
+      <div class="page" id="page-roster">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-users"></i>الأعضاء</div></div>
+        <div class="data-table">
+          <div class="t-header" style="grid-template-columns:2fr 1.2fr .7fr 1.6fr"><span>الاسم</span><span>الرتبة</span><span>المستوى</span><span>XP</span></div>
+          <div id="roster-list"></div>
+        </div>
+      </div>
+
       <!-- GROUP TASKS (leader only) -->
       <div class="page" id="page-grouptasks">
         <div class="page-title"><div class="pt-l"><i class="ti ti-users-group"></i>المهام الجماعية</div>
@@ -963,6 +972,7 @@ function renderSidebar() {
     <div class="nav-section">القائمة</div>
     <div class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')"><i class="ti ti-layout-dashboard"></i><span>الرئيسية</span></div>
     <div class="nav-item" id="nav-mytasks" onclick="navigate('mytasks')"><i class="ti ti-checklist"></i><span>مهامي</span></div>
+    <div class="nav-item" id="nav-roster" onclick="navigate('roster')"><i class="ti ti-users"></i><span>الأعضاء</span></div>
     <div class="nav-item" id="nav-ranks" onclick="navigate('ranks')"><i class="ti ti-trophy"></i><span>الرتب</span></div>
     <div class="nav-divider"></div>
     <div class="nav-item" id="nav-news" onclick="navigate('news')"><i class="ti ti-news"></i><span>الأخبار</span></div>
@@ -1028,6 +1038,7 @@ function navigate(page) {
   if (page === 'pending') loadPending();
   if (page === 'tasks') loadTasks();
   if (page === 'mytasks') { loadMyTasks(); loadTasks(); loadGroupTasks(); }
+  if (page === 'roster') loadRoster();
   if (page === 'news') loadNews();
   if (page === 'chat') initChat();
   if (page === 'room') { loadRoom(); setTimeout(loadRoomChat, 500); }
@@ -1122,6 +1133,7 @@ function startRealtimeSubscriptions() {
           if (cav) cav.innerHTML = avatarHTML(payload.new);
         }
         if (document.getElementById('room-chat-msgs')) loadRoomMessages();
+        if (document.getElementById('page-roster')?.classList.contains('active')) loadRoster();
       }).subscribe();
   }
 }
@@ -1171,7 +1183,7 @@ async function loadDashboard() {
   const top = [...members].sort((a,b) => b.xp - a.xp).slice(0,5);
   el('dash-top').innerHTML = top.length ? top.map(m => `
     <div class="t-row" style="grid-template-columns:2fr 1fr 1fr;cursor:pointer" onclick="navigate(isLeader?'members':'ranks')">
-      <div class="mn-cell"><div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'}">${(m.full_name||'?')[0]}</div><span>${m.full_name||m.email}</span></div>
+      <div class="mn-cell"><div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden">${avatarHTML(m)}</div><span>${m.full_name||m.email}</span></div>
       <span class="r-badge" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)}">${m.rank||'Member'}</span>
       <span style="color:var(--xp);font-weight:700;font-size:12px">${m.xp||0} XP</span>
     </div>`).join('') : emptyState('لا يوجد أعضاء بعد');
@@ -1191,6 +1203,23 @@ async function loadDashboard() {
 // ================================================================
 //  MEMBERS
 // ================================================================
+async function loadRoster() {
+  // نسخة للقراءة فقط من قائمة الأعضاء — تظهر لكل الأعضاء، من غير أي أزرار إجراءات
+  const { data: members } = await sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL).order('xp', {ascending:false});
+  const el2 = el('roster-list');
+  if (!el2) return;
+  el2.innerHTML = members?.length ? members.map(m => `
+    <div class="t-row" style="grid-template-columns:2fr 1.2fr .7fr 1.6fr">
+      <div class="mn-cell">
+        <div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden">${avatarHTML(m)}</div>
+        <div><div>${m.full_name||m.email}</div>${m.band?`<span style="font-size:9px;color:var(--gold)">🏷 ${m.band}</span>`:''}</div>
+      </div>
+      <span class="r-badge" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)}">${m.rank||'Member'}</span>
+      <span style="font-size:13px;font-weight:700">Lv.${m.level||1}</span>
+      <div class="xp-wrap"><div class="xp-bar"><div class="xp-fill" style="width:${Math.min(100,Math.round((m.xp||0)/(m.max_xp||50)*100))}%"></div></div><span class="xp-num">${m.xp||0}/${m.max_xp||50}</span></div>
+    </div>`).join('') : emptyState('لا يوجد أعضاء نشطون بعد');
+}
+
 async function loadMembers() {
   if (!isLeader) return;
   // القائد مش في قائمة الأعضاء
