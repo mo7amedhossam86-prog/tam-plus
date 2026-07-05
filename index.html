@@ -754,6 +754,7 @@ async function init() {
       currentUser = session.user;
       await loadUserProfile();
       showApp();
+      registerPushNotifications();
     } else {
       showAuth();
     }
@@ -765,7 +766,7 @@ async function init() {
     if (event === 'SIGNED_IN' && session) {
       currentUser = session.user;
       const ok = await loadUserProfile();
-      if (ok !== false) showApp();
+      if (ok !== false) { showApp(); registerPushNotifications(); }
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
       userProfile = null;
@@ -1702,6 +1703,7 @@ async function sendMsg() {
   }
   inp.value = '';
   await sb.from('messages').insert(row);
+  sendPushTo(currentChatUserId, userProfile?.full_name || 'رسالة جديدة', txt || '📎 مرفق جديد', '/');
   await loadMessages(currentChatUserId);
 }
 
@@ -2302,6 +2304,7 @@ async function addNews() {
   const tags = {green:'إعلان',blue:'تحديث',red:'تنبيه',gold:'إنجاز'};
   if (!title) { alert('يرجى إدخال العنوان'); return; }
   await sb.from('news').insert({ title, content, tag: tags[tc], tag_color: tc });
+  sendPushToAll('📰 خبر جديد في TAM+', title, '/');
   closeModal(); loadNews();
 }
 
@@ -2762,17 +2765,72 @@ function timeAgo(dateStr) {
 }
 
 // ================================================================
-//  PUSH NOTIFICATIONS (PWA)
+//  PUSH NOTIFICATIONS (PWA) — إشعارات حقيقية خارج الموقع
 // ================================================================
+// المفتاح العام (VAPID) — لازم يطابق المفتاح الخاص المحفوظ في Supabase Edge Function
+const VAPID_PUBLIC_KEY = 'BLl0EmM7EouZ-dbEn03Rb0-LnXCoBCH1ZkOjiRBc8xnQkhKhQgRpH2fOS7ATMj6fktyzkIb4jZlNe1jyonVTmA8';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
 async function registerPushNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!currentUser) return; // لازم يكون فيه يوزر عامل لوجين قبل الاشتراك
   try {
-    const reg = await navigator.serviceWorker.register('/sw.js');
+    const reg = await navigator.serviceWorker.register('./sw.js');
+    await navigator.serviceWorker.ready;
+
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return;
+    if (permission !== 'granted') { console.log('Push permission:', permission); return; }
+
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+
+    const p256dhKey = sub.getKey('p256dh');
+    const authKey = sub.getKey('auth');
+    const p256dh = btoa(String.fromCharCode(...new Uint8Array(p256dhKey)));
+    const authStr = btoa(String.fromCharCode(...new Uint8Array(authKey)));
+
+    await sb.from('push_subscriptions').upsert({
+      user_id: currentUser.id,
+      endpoint: sub.endpoint,
+      p256dh,
+      auth: authStr,
+    }, { onConflict: 'endpoint' });
+
     console.log('Push notifications enabled ✓');
-  } catch(e) {
+  } catch (e) {
     console.log('Push not supported:', e.message);
+  }
+}
+
+// بيبعت إشعار حقيقي (خارج الموقع) لعضو واحد عن طريق Edge Function
+async function sendPushTo(userId, title, body, url) {
+  if (!userId) return;
+  try {
+    await sb.functions.invoke('send-push', { body: { user_id: userId, title, body, url: url || './' } });
+  } catch (e) {
+    console.log('sendPushTo failed:', e.message);
+  }
+}
+
+// بيبعت إشعار حقيقي لكل الأعضاء (مثلاً خبر جديد)
+async function sendPushToAll(title, body, url) {
+  try {
+    await sb.functions.invoke('send-push', { body: { all: true, title, body, url: url || './' } });
+  } catch (e) {
+    console.log('sendPushToAll failed:', e.message);
   }
 }
 
@@ -2780,8 +2838,8 @@ function sendLocalNotif(title, body) {
   if (Notification.permission === 'granted') {
     new Notification(title, {
       body,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
       tag: 'tam-plus',
       renotify: true,
     });
@@ -2793,7 +2851,6 @@ function sendLocalNotif(title, body) {
 // ================================================================
 window.addEventListener('load', () => {
   init();
-  registerPushNotifications();
 });
 </script>
 
@@ -2918,6 +2975,16 @@ window.addEventListener('load', () => {
        joined_at TIMESTAMPTZ DEFAULT NOW()
      );
 
+     -- جدول اشتراكات الإشعارات (Push Subscriptions) — عشان الإشعارات تشتغل حتى والموقع مقفول
+     CREATE TABLE push_subscriptions (
+       id BIGSERIAL PRIMARY KEY,
+       user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+       endpoint TEXT UNIQUE NOT NULL,
+       p256dh TEXT NOT NULL,
+       auth TEXT NOT NULL,
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
      -- تفعيل RLS
      ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
      ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
@@ -2929,6 +2996,7 @@ window.addEventListener('load', () => {
      ALTER TABLE bands ENABLE ROW LEVEL SECURITY;
      ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
      ALTER TABLE room_members ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
 
      -- السياسات
      CREATE POLICY "everyone can read" ON profiles FOR SELECT USING (true);
@@ -2989,6 +3057,9 @@ window.addEventListener('load', () => {
      CREATE POLICY "read room" ON room_members FOR SELECT USING (true);
      CREATE POLICY "join room" ON room_members FOR INSERT WITH CHECK (auth.uid() = user_id);
      CREATE POLICY "leave room" ON room_members FOR DELETE USING (auth.uid() = user_id OR true);
+
+     -- اشتراكات الإشعارات: كل عضو يدير اشتراكه بس، والـ Edge Function (service role) بتقرأ الكل عشان تبعت
+     CREATE POLICY "user manages own push sub" ON push_subscriptions FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
      -- تفعيل Realtime على الجداول المطلوبة من Database → Replication:
      -- messages / elite_messages / tasks / task_submissions / news / profiles / bands
