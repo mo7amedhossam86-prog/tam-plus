@@ -1,6 +1,7 @@
-// sw.js — Service Worker لإشعارات TAM+
-// هذا الملف بيفضل شغال في الخلفية من المتصفح حتى لو الموقع والتاب مقفولين تماماً،
-// وده اللي بيسمح بظهور إشعار حقيقي زي تطبيقات الموبايل (واتساب مثلاً).
+// ================================================================
+//  TAM+ Service Worker — لازم يتحط في نفس مجلد index.html بالظبط
+//  (يعني: yourapp.com/sw.js — مش جوه فولدر فرعي)
+// ================================================================
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -10,43 +11,43 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// لما يوصل push من السيرفر (Supabase Edge Function) عبر خدمة Push بتاعة المتصفح
+// لما يوصل Push حقيقي من السيرفر (حتى والموقع مقفول)
 self.addEventListener('push', (event) => {
-  let data = { title: 'TAM+', body: 'إشعار جديد', url: './' };
+  let data = {};
   try {
-    if (event.data) data = { ...data, ...event.data.json() };
+    data = event.data ? event.data.json() : {};
   } catch (e) {
-    if (event.data) data.body = event.data.text();
+    data = { title: 'TAM+', body: event.data ? event.data.text() : '' };
   }
 
+  const title = data.title || 'TAM+ 🔔';
   const options = {
-    body: data.body,
+    body: data.body || '',
     icon: './icon-192.png',
     badge: './icon-192.png',
-    tag: data.tag || 'tam-plus',
-    renotify: true,
-    dir: 'rtl',
-    lang: 'ar',
     data: { url: data.url || './' },
+    tag: 'tam-plus-' + Date.now(), // tag فريد عشان الإشعارات المختلفة متبقاش بتلغي بعض
+    renotify: true,
     vibrate: [100, 50, 100],
   };
 
-  event.waitUntil(self.registration.showNotification(data.title, options));
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// لما المستخدم يدوس على الإشعار — يفتح الموقع (أو يركز التاب المفتوح لو موجود)
+// لما المستخدم يدوس على الإشعار — يفتحله الموقع
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || './';
+  const url = (event.notification.data && event.notification.data.url) || './';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
       for (const client of clientsArr) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
+        if ('focus' in client) {
+          if ('navigate' in client) client.navigate(url);
           return client.focus();
         }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+      if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
 });

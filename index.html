@@ -2920,14 +2920,24 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function registerPushNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.log('❌ المتصفح ده مش بيدعم Push Notifications');
+    return;
+  }
   if (!currentUser) return; // لازم يكون فيه يوزر عامل لوجين قبل الاشتراك
-  try {
-    const reg = await navigator.serviceWorker.register('./sw.js');
-    await navigator.serviceWorker.ready;
 
+  let reg;
+  try {
+    reg = await navigator.serviceWorker.register('./sw.js');
+    await navigator.serviceWorker.ready;
+  } catch (e) {
+    console.error('❌ فشل تسجيل sw.js — تأكد إن ملف sw.js موجود في نفس مجلد index.html على السيرفر:', e.message);
+    return;
+  }
+
+  try {
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') { console.log('Push permission:', permission); return; }
+    if (permission !== 'granted') { console.log('⚠️ المستخدم رفض إذن الإشعارات:', permission); return; }
 
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
@@ -2942,16 +2952,21 @@ async function registerPushNotifications() {
     const p256dh = btoa(String.fromCharCode(...new Uint8Array(p256dhKey)));
     const authStr = btoa(String.fromCharCode(...new Uint8Array(authKey)));
 
-    await sb.from('push_subscriptions').upsert({
+    const { error: upsertErr } = await sb.from('push_subscriptions').upsert({
       user_id: currentUser.id,
       endpoint: sub.endpoint,
       p256dh,
       auth: authStr,
     }, { onConflict: 'endpoint' });
 
-    console.log('Push notifications enabled ✓');
+    if (upsertErr) {
+      console.error('❌ فشل حفظ الاشتراك في push_subscriptions:', upsertErr.message);
+      return;
+    }
+
+    console.log('✅ Push notifications enabled — الاشتراك محفوظ في قاعدة البيانات');
   } catch (e) {
-    console.log('Push not supported:', e.message);
+    console.error('❌ فشل الاشتراك في Push:', e.message);
   }
 }
 
@@ -2959,18 +2974,20 @@ async function registerPushNotifications() {
 async function sendPushTo(userId, title, body, url) {
   if (!userId) return;
   try {
-    await sb.functions.invoke('send-push', { body: { user_id: userId, title, body, url: url || './' } });
+    const { error } = await sb.functions.invoke('send-push', { body: { user_id: userId, title, body, url: url || './' } });
+    if (error) console.error('❌ sendPushTo edge function error:', error.message || error);
   } catch (e) {
-    console.log('sendPushTo failed:', e.message);
+    console.error('❌ sendPushTo failed (تأكد إن Edge Function اسمها send-push متنشرة):', e.message);
   }
 }
 
 // بيبعت إشعار حقيقي لكل الأعضاء (مثلاً خبر جديد أو قانون جديد)
 async function sendPushToAll(title, body, url) {
   try {
-    await sb.functions.invoke('send-push', { body: { all: true, title, body, url: url || './' } });
+    const { error } = await sb.functions.invoke('send-push', { body: { all: true, title, body, url: url || './' } });
+    if (error) console.error('❌ sendPushToAll edge function error:', error.message || error);
   } catch (e) {
-    console.log('sendPushToAll failed:', e.message);
+    console.error('❌ sendPushToAll failed (تأكد إن Edge Function اسمها send-push متنشرة):', e.message);
   }
 }
 
