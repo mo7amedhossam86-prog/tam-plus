@@ -46,7 +46,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text)}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ===== AUTH SCREEN ===== */
-#auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:safe center;z-index:9999;gap:24px;overflow-y:auto;padding:20px 0}
+#auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;z-index:9999;overflow-y:auto;padding:20px 0}
+.auth-center-wrap{margin:auto;display:flex;flex-direction:column;align-items:center;gap:24px}
 /* اللوجو SVG */
 .logo-flower{width:240px;height:240px;animation:spinIn 1.1s cubic-bezier(.34,1.56,.64,1) both}
 .petal{animation:petalPulse 3s ease-in-out infinite}
@@ -307,6 +308,7 @@ select.inp{cursor:pointer}
 
 <!-- AUTH SCREEN -->
 <div id="auth-screen" style="display:none">
+ <div class="auth-center-wrap">
   <svg class="logo-flower" viewBox="0 0 680 450" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <radialGradient id="grad-blue" cx="32%" cy="26%" r="80%">
@@ -363,6 +365,7 @@ select.inp{cursor:pointer}
       <button class="btn-primary" id="reg-btn" onclick="doRegister()">إنشاء الحساب</button>
     </div>
   </div>
+ </div>
 </div>
 
 <!-- APP -->
@@ -488,11 +491,17 @@ select.inp{cursor:pointer}
               <div><div style="font-weight:700;font-size:12px" id="c-name">اختر محادثة</div><div style="font-size:9px;color:var(--green)">🔒 خاص بينك وبين القائد فقط</div></div>
             </div>
             <div class="chat-msgs" id="chat-msgs"><div style="text-align:center;color:var(--muted);font-size:11px;margin:auto;padding:20px">اختر محادثة من القائمة</div></div>
+            <div id="c-voice-bar" style="display:none;align-items:center;gap:8px;padding:6px 13px;font-size:11px;color:var(--red)">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulse 1s infinite"></span>
+              <span>جاري التسجيل... <b id="c-voice-timer">0:00</b></span>
+              <button onclick="cancelVoiceRecording()" style="margin-right:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px">إلغاء ✕</button>
+            </div>
             <div class="chat-inp-row">
               <input type="file" id="c-file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip" style="display:none" onchange="onChatFileSelected()">
               <button class="send-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="document.getElementById('c-file').click()" title="إرفاق ملف/صورة/فيديو"><i class="ti ti-paperclip" style="font-size:14px;color:var(--muted)"></i></button>
+              <button class="send-btn" id="c-mic-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="toggleVoice('private')" title="رسالة صوتية"><i class="ti ti-microphone" style="font-size:14px;color:var(--muted)"></i></button>
               <input class="chat-inp" id="c-inp" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter')sendMsg()">
-              <button class="send-btn" onclick="sendMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
+              <button class="send-btn" id="private-send-btn" onclick="sendMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
             </div>
             <div id="c-file-preview" style="display:none;padding:4px 13px;font-size:10px;color:var(--gold)"></div>
           </div>
@@ -535,6 +544,15 @@ select.inp{cursor:pointer}
       <div class="page" id="page-profile">
         <div class="page-title"><div class="pt-l"><i class="ti ti-user"></i>ملفي الشخصي</div></div>
         <div class="profile-card" id="profile-card"></div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:18px;margin-bottom:16px">
+          <div class="sec-title" style="margin-bottom:12px">🖼️ الصورة الشخصية</div>
+          <input type="file" id="avatar-file" accept="image/*" style="display:none" onchange="onAvatarFileSelected()">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-primary" style="width:auto;padding:9px 16px;font-size:12px" onclick="openEmojiPicker()">🙂 اختيار إيموجي</button>
+            <button class="btn-primary" style="width:auto;padding:9px 16px;font-size:12px;background:linear-gradient(135deg,#555,#222)" onclick="document.getElementById('avatar-file').click()">📷 رفع صورة من الجهاز</button>
+          </div>
+          <div id="avatar-status-msg" style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.8"></div>
+        </div>
         <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:18px">
           <div class="sec-title" style="margin-bottom:12px">تغيير كلمة المرور</div>
           <div class="form-group"><label class="form-label">كلمة المرور الجديدة</label><input class="inp" id="new-pass" type="password" placeholder="••••••••"></div>
@@ -954,8 +972,9 @@ function renderSidebar() {
 }
 
 function renderTopbar() {
-  const name = userProfile?.full_name || currentUser?.email || '?';
-  document.getElementById('top-av').textContent = name[0].toUpperCase();
+  const topAv = document.getElementById('top-av');
+  topAv.style.overflow = 'hidden';
+  topAv.innerHTML = avatarHTML(userProfile);
   document.getElementById('top-role-badge').textContent = isLeader ? '👑 القائد الأعلى' : '👤 عضو';
   document.getElementById('top-role-badge').className = 'role-badge ' + (isLeader ? 'role-leader' : 'role-member');
   if (isLeader) { show('notif-btn'); }
@@ -968,11 +987,11 @@ function renderTopbar() {
 let lastPendingCount = 0;
 async function checkPendingNotif() {
   const { data: pending } = await sb.from('profiles').select('id').eq('status','pending');
+  const avatarPendingCount = await countPendingAvatars();
   const dot = document.getElementById("notif-dot");
   const navEl = document.getElementById('nav-pending');
   const count = pending?.length || 0;
   if (count > 0) {
-    if (dot) dot.style.display = "block";
     if (navEl) {
       const badge = `<i class="ti ti-user-check"></i><span>طلبات الانضمام</span><span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${count}</span>`;
       navEl.innerHTML = badge;
@@ -981,9 +1000,8 @@ async function checkPendingNotif() {
     if (count > lastPendingCount) {
       sendLocalNotif('TAM+ 🔔', `${count - lastPendingCount} طلب انضمام جديد بانتظار موافقتك`);
     }
-  } else {
-    if (dot) dot.style.display = "none";
   }
+  if (dot) dot.style.display = (count > 0 || avatarPendingCount > 0) ? "block" : "none";
   lastPendingCount = count;
 }
 
@@ -1156,7 +1174,7 @@ async function loadMembers() {
   el('members-list').innerHTML = members?.length ? members.map(m => `
     <div class="t-row" style="grid-template-columns:1.8fr 1.2fr .6fr 1.4fr .8fr 2.2fr">
       <div class="mn-cell">
-        <div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'}">${(m.full_name||'?')[0]}</div>
+        <div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden">${avatarHTML(m)}</div>
         <div><div>${m.full_name||m.email}</div>${m.band?`<span style="font-size:9px;color:var(--gold)">🏷 ${m.band}</span>`:''}</div>
       </div>
       <span class="r-badge" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)}">${m.rank||'Member'}</span>
@@ -1186,7 +1204,7 @@ async function loadPending() {
   const { data: pending } = await sb.from('profiles').select('*').eq('status','pending');
   el('pending-list').innerHTML = pending?.length ? pending.map(m => `
     <div class="t-row" style="grid-template-columns:2fr 2fr 1fr">
-      <div class="mn-cell"><div class="m-av" style="background:#29ABE222;color:#29ABE2">${(m.full_name||'?')[0]}</div><span>${m.full_name||'غير معروف'}</span></div>
+      <div class="mn-cell"><div class="m-av" style="background:#29ABE222;color:#29ABE2;overflow:hidden">${avatarHTML(m)}</div><span>${m.full_name||'غير معروف'}</span></div>
       <span style="font-size:11px;color:var(--muted)">${m.email}</span>
       <div class="act-btns">
         <button class="bs bg" onclick="approveMember('${m.id}')">✓ قبول</button>
@@ -1467,7 +1485,7 @@ async function initChat() {
     }
     el('chat-list').innerHTML = members.map(m => `
       <div class="chat-item" id="chat-item-${m.id}" onclick="openChatWith('${m.id}','${m.full_name||m.email}','${m.color||'#29ABE2'}')">
-        <div class="chat-av" style="background:${m.color||'#29ABE2'}44;color:${m.color||'#29ABE2'}">${(m.full_name||'?')[0].toUpperCase()}</div>
+        <div class="chat-av" style="background:${m.color||'#29ABE2'}44;color:${m.color||'#29ABE2'};overflow:hidden">${avatarHTML(m)}</div>
         <div style="overflow:hidden"><div class="chat-name">${m.full_name||m.email}</div><div class="chat-prev">${m.rank||'Member'}</div></div>
       </div>`).join('');
     // Auto open first member
@@ -1492,9 +1510,12 @@ async function openChatWith(userId, name, color) {
   document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
   const item = document.getElementById('chat-item-' + userId);
   if (item) item.classList.add('active');
-  el('c-av').textContent = name[0];
+  el('c-av').innerHTML = name[0];
   el('c-av').style.background = `linear-gradient(135deg,${color},${color}88)`;
+  el('c-av').style.overflow = 'hidden';
   el('c-name').textContent = name;
+  sb.from('profiles').select('full_name,avatar_type,avatar_value,avatar_status').eq('id', userId).single()
+    .then(({data}) => { if (data && currentChatUserId === userId) el('c-av').innerHTML = avatarHTML(data); });
   
   // Unsubscribe old
   if (chatSubscription) { sb.removeChannel(chatSubscription); }
@@ -1536,18 +1557,33 @@ async function loadMessages(otherUserId) {
 //  MEDIA — رفع وعرض كل أنواع الوسائط (صور/فيديو/صوت/ملفات) في الشات الخاص وشات النخبة
 // ================================================================
 let pendingChatFile = null;
-function onChatFileSelected() {
+const MAX_ATTACH_MB = 25;
+async function onChatFileSelected() {
   const inp = el('c-file');
-  pendingChatFile = inp.files?.[0] || null;
+  let file = inp.files?.[0] || null;
   const prev = el('c-file-preview');
-  if (pendingChatFile && prev) { prev.style.display='block'; prev.textContent = '📎 ' + pendingChatFile.name + ' — هيتبعت مع الرسالة الجاية'; }
+  if (!file) { pendingChatFile = null; return; }
+  if (file.size > MAX_ATTACH_MB*1024*1024) {
+    alert(`الملف كبير جداً (أكبر من ${MAX_ATTACH_MB} ميجا)، اختار ملف أصغر`);
+    inp.value = ''; pendingChatFile = null; if (prev) prev.style.display='none';
+    return;
+  }
+  if (file.type.startsWith('image/')) {
+    if (prev) { prev.style.display='block'; prev.textContent = '⏳ جاري تجهيز الصورة...'; }
+    file = await compressImageFile(file);
+  }
+  pendingChatFile = file;
+  if (prev) { prev.style.display='block'; prev.textContent = '📎 ' + file.name + ' — هيتبعت مع الرسالة الجاية'; }
 }
 
 async function uploadChatMedia(file, folder) {
   const ext = file.name.split('.').pop();
   const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
   const { error } = await sb.storage.from('chat-media').upload(path, file);
-  if (error) { alert('فشل رفع الملف: ' + error.message); return null; }
+  if (error) {
+    alert('فشل رفع الملف: ' + error.message + '\n(تأكد إن bucket اسمه chat-media متعمل وصلاحياته مظبوطة في Supabase Storage)');
+    return null;
+  }
   const { data } = sb.storage.from('chat-media').getPublicUrl(path);
   let mediaType = 'file';
   if (file.type.startsWith('image/')) mediaType = 'image';
@@ -1585,16 +1621,19 @@ async function sendMsg() {
   const inp = el('c-inp');
   const txt = inp.value.trim();
   if (!txt && !pendingChatFile) return;
-  inp.value = '';
   const chatKey = getChatKey(currentUser.id, currentChatUserId);
   const row = { chat_key: chatKey, sender_id: currentUser.id, receiver_id: currentChatUserId, content: txt };
   if (pendingChatFile) {
+    setSendingState(true, 'private');
     const media = await uploadChatMedia(pendingChatFile, chatKey);
-    if (media) { row.media_url = media.url; row.media_type = media.type; }
+    setSendingState(false, 'private');
+    if (!media) return; // فشل الرفع — منبعتش رسالة فاضية
+    row.media_url = media.url; row.media_type = media.type;
     pendingChatFile = null;
     el('c-file').value = '';
     if (el('c-file-preview')) el('c-file-preview').style.display = 'none';
   }
+  inp.value = '';
   await sb.from('messages').insert(row);
   await loadMessages(currentChatUserId);
 }
@@ -1846,10 +1885,11 @@ async function assignBand() {
 async function loadProfile() {
   const { data: p } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
   if (!p) return;
+  currentProfileCache = p;
   const pct = Math.min(100, Math.round((p.xp||0)/(p.max_xp||50)*100));
   const rc = rankColor(p.rank);
   el('profile-card').innerHTML = `
-    <div class="profile-av-big" style="background:${isLeader?'rgba(255,179,0,.2)':p.color+'22'};color:${isLeader?'var(--gold)':p.color||'#29ABE2'}">${(p.full_name||'?')[0]}</div>
+    <div class="profile-av-big" style="background:${isLeader?'rgba(255,179,0,.2)':p.color+'22'};color:${isLeader?'var(--gold)':p.color||'#29ABE2'};overflow:hidden">${avatarHTML(p, true)}</div>
     <div class="profile-name">${p.full_name||'عضو'}</div>
     <div class="profile-rank">${p.email}</div>
     <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:12px">
@@ -1866,6 +1906,227 @@ async function loadProfile() {
       <div class="profile-xp-bar"><div class="profile-xp-fill" style="width:${pct}%"></div></div>
     </div>`}
     ${isLeader?'<div style="margin-top:16px;font-size:13px;color:var(--gold);line-height:1.8">أنت القائد الأعلى لـ TAM+<br><span style="font-size:11px;color:var(--muted)">True Amity Makers Plus</span></div>':''}`;
+  const statusEl = el('avatar-status-msg');
+  if (statusEl) {
+    if (p.avatar_type === 'photo' && p.avatar_status === 'pending') statusEl.innerHTML = '⏳ صورتك قيد المراجعة من القائد، لسه شكلك القديم ظاهر للكل لحد ما توافق عليها';
+    else statusEl.innerHTML = '';
+  }
+}
+
+// ================================================================
+//  AVATARS — إيموجي / صورة (تحتاج موافقة القائد)
+// ================================================================
+let currentProfileCache = null;
+const EMOJI_CHOICES = ['😀','😎','🔥','👑','⚡','🐉','🦁','🐺','🎮','⚔️','🛡️','🚀','💎','🌟','👻','🤖','🥷','🎯','☠️','🧠','🐲','🦅','🐯','💥','🌙','☀️','🎧','⭐','🍀','🃏'];
+
+function avatarHTML(p, big) {
+  const initial = (p?.full_name || p?.email || '?')[0]?.toUpperCase() || '?';
+  const fontSize = big ? '38px' : 'inherit';
+  if (p?.avatar_type === 'photo' && p?.avatar_status === 'approved' && p?.avatar_value) {
+    return `<img src="${p.avatar_value}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" alt="">`;
+  }
+  if (p?.avatar_type === 'emoji' && p?.avatar_value) {
+    return `<span style="font-size:${fontSize};line-height:1">${p.avatar_value}</span>`;
+  }
+  return initial;
+}
+
+function openEmojiPicker() {
+  showModal(`
+    <div class="modal-title">🙂 اختر إيموجي كصورة شخصية</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px">
+      ${EMOJI_CHOICES.map(e => `<div onclick="chooseEmojiAvatar('${e}')" style="cursor:pointer;text-align:center;font-size:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 0;transition:transform .15s" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">${e}</div>`).join('')}
+    </div>
+    <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إلغاء</button></div>`);
+}
+
+async function chooseEmojiAvatar(emoji) {
+  await sb.from('profiles').update({ avatar_type:'emoji', avatar_value: emoji, avatar_status:'approved' }).eq('id', currentUser.id);
+  closeModal();
+  await loadProfile();
+  renderTopbar();
+  alert('✅ تم تحديث صورتك الشخصية');
+}
+
+async function onAvatarFileSelected() {
+  const inp = el('avatar-file');
+  const file = inp.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { alert('لازم تختار صورة'); inp.value=''; return; }
+  if (file.size > 15*1024*1024) { alert('الصورة كبيرة جداً، اختار صورة أصغر من 15 ميجا'); inp.value=''; return; }
+  const statusEl = el('avatar-status-msg');
+  if (statusEl) statusEl.innerHTML = '⏳ جاري رفع الصورة...';
+  const compressed = await compressImageFile(file, 800, 0.85);
+  const ext = 'jpg';
+  const path = `${currentUser.id}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const { error } = await sb.storage.from('avatars').upload(path, compressed);
+  inp.value = '';
+  if (error) {
+    if (statusEl) statusEl.innerHTML = '';
+    alert('فشل رفع الصورة: ' + error.message + '\n(تأكد إن bucket اسمه avatars متعمل في Supabase Storage)');
+    return;
+  }
+  const { data } = sb.storage.from('avatars').getPublicUrl(path);
+  await sb.from('profiles').update({ avatar_type:'photo', avatar_value: data.publicUrl, avatar_status:'pending' }).eq('id', currentUser.id);
+  await loadProfile();
+  alert('✅ تم رفع الصورة، وهتظهر للكل بعد موافقة القائد عليها');
+}
+
+// مراجعة القائد لطلبات الصور
+async function countPendingAvatars() {
+  const { data } = await sb.from('profiles').select('id').eq('avatar_type','photo').eq('avatar_status','pending');
+  return data?.length || 0;
+}
+
+async function reviewAvatarsModal() {
+  const { data: pend } = await sb.from('profiles').select('*').eq('avatar_type','photo').eq('avatar_status','pending');
+  showModal(`
+    <div class="modal-title">🖼️ مراجعة الصور الشخصية</div>
+    ${pend?.length ? pend.map(p => `
+      <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
+        <img src="${p.avatar_value}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0">
+        <div style="flex:1;font-size:12px;font-weight:600">${p.full_name||p.email}</div>
+        <button class="bs bg" onclick="approveAvatar('${p.id}')">✓ قبول</button>
+        <button class="bs br" onclick="rejectAvatar('${p.id}')">× رفض</button>
+      </div>`).join('') : '<div class="empty-state"><i class="ti ti-photo"></i><p>لا توجد صور بانتظار المراجعة</p></div>'}
+    <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إغلاق</button></div>`);
+}
+
+async function approveAvatar(id) {
+  await sb.from('profiles').update({ avatar_status:'approved' }).eq('id', id);
+  reviewAvatarsModal();
+  checkPendingNotif();
+}
+
+async function rejectAvatar(id) {
+  await sb.from('profiles').update({ avatar_type:'emoji', avatar_value:'', avatar_status:'approved' }).eq('id', id);
+  reviewAvatarsModal();
+  checkPendingNotif();
+}
+
+// ضغط الصور قبل الرفع (بيحل مشكلة صور الموبايل الكبيرة اللي كانت بتفشل في الإرسال)
+function compressImageFile(file, maxDim, quality) {
+  maxDim = maxDim || 1600; quality = quality || 0.82;
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/') || file.type === 'image/gif') { resolve(file); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const { width, height } = img;
+        if (width <= maxDim && height <= maxDim && file.size < 1.2*1024*1024) { resolve(file); return; }
+        const scale = Math.min(1, maxDim / Math.max(width, height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (!blob) { resolve(file); return; }
+          const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+          resolve(new File([blob], newName, { type: 'image/jpeg' }));
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
+// ================================================================
+//  VOICE MESSAGES — تسجيل وإرسال رسائل صوتية
+// ================================================================
+let voiceRecorder = null, voiceChunks = [], voiceContext = null, voiceStream = null, voiceTimerInterval = null, voiceStartTime = 0, voiceCancelled = false;
+
+async function toggleVoice(context) {
+  if (voiceRecorder && voiceRecorder.state === 'recording') { stopVoiceRecording(); return; }
+  if (context === 'private' && !currentChatUserId) { alert('اختر محادثة أولاً'); return; }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    alert('لازم تسمح للموقع بالوصول للميكروفون عشان تبعت رسالة صوتية');
+    return;
+  }
+  voiceStream = stream;
+  voiceContext = context;
+  voiceChunks = [];
+  voiceCancelled = false;
+  const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+  voiceRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+  voiceRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) voiceChunks.push(e.data); };
+  voiceRecorder.onstop = () => onVoiceStopped();
+  voiceRecorder.start();
+  voiceStartTime = Date.now();
+  showVoiceUI(context, true);
+  voiceTimerInterval = setInterval(() => updateVoiceTimer(context), 500);
+}
+
+function updateVoiceTimer(context) {
+  const secs = Math.floor((Date.now() - voiceStartTime) / 1000);
+  const m = Math.floor(secs / 60), s = secs % 60;
+  const label = (m + ':' + String(s).padStart(2,'0'));
+  const idEl = el(context === 'private' ? 'c-voice-timer' : 'room-voice-timer');
+  if (idEl) idEl.textContent = label;
+  if (secs >= 120) stopVoiceRecording(); // حد أقصى دقيقتين للرسالة الصوتية
+}
+
+function showVoiceUI(context, recording) {
+  const bar = el(context === 'private' ? 'c-voice-bar' : 'room-voice-bar');
+  const micBtn = el(context === 'private' ? 'c-mic-btn' : 'room-mic-btn');
+  if (bar) bar.style.display = recording ? 'flex' : 'none';
+  if (micBtn) micBtn.innerHTML = recording
+    ? '<i class="ti ti-player-stop" style="font-size:14px;color:var(--red)"></i>'
+    : '<i class="ti ti-microphone" style="font-size:14px;color:var(--muted)"></i>';
+}
+
+function stopVoiceRecording() {
+  if (voiceRecorder && voiceRecorder.state === 'recording') voiceRecorder.stop();
+  if (voiceStream) voiceStream.getTracks().forEach(t => t.stop());
+  clearInterval(voiceTimerInterval);
+}
+
+function cancelVoiceRecording() {
+  voiceCancelled = true;
+  stopVoiceRecording();
+  showVoiceUI(voiceContext, false);
+}
+
+async function onVoiceStopped() {
+  const ctx = voiceContext;
+  showVoiceUI(ctx, false);
+  if (voiceCancelled) { voiceChunks = []; return; }
+  const blob = new Blob(voiceChunks, { type: 'audio/webm' });
+  voiceChunks = [];
+  if (blob.size < 800) return; // تسجيل قصير جداً/فاضي، متبعتوش
+  const file = new File([blob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+  if (ctx === 'private') {
+    if (!currentChatUserId) return;
+    const chatKey = getChatKey(currentUser.id, currentChatUserId);
+    setSendingState(true, 'private');
+    const media = await uploadChatMedia(file, chatKey);
+    setSendingState(false, 'private');
+    if (!media) return;
+    await sb.from('messages').insert({ chat_key: chatKey, sender_id: currentUser.id, receiver_id: currentChatUserId, content: '', media_url: media.url, media_type: 'audio' });
+    await loadMessages(currentChatUserId);
+  } else {
+    setSendingState(true, 'room');
+    const media = await uploadChatMedia(file, 'room-elite');
+    setSendingState(false, 'room');
+    if (!media) return;
+    const { error } = await sb.from('elite_messages').insert({ sender_id: currentUser.id, sender_name: userProfile?.full_name || currentUser.email, content: '', media_url: media.url, media_type: 'audio' });
+    if (error) { alert('لازم تكون عضو في غرفة النخبة عشان تبعت رسالة'); return; }
+    await loadRoomMessages();
+  }
+}
+
+function setSendingState(sending, which) {
+  const btn = el(which + '-send-btn');
+  if (!btn) return;
+  btn.disabled = sending;
+  btn.innerHTML = sending ? '<i class="ti ti-loader-2" style="font-size:14px"></i>' : '<i class="ti ti-send" style="font-size:14px"></i>';
 }
 
 // ================================================================
@@ -2037,11 +2298,17 @@ async function loadRoomChat() {
       <div id="room-chat-msgs" style="height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px">
         <div style="text-align:center;color:var(--muted);font-size:11px">جاري تحميل الرسائل...</div>
       </div>
+      <div id="room-voice-bar" style="display:none;align-items:center;gap:8px;padding:4px 2px 8px;font-size:11px;color:var(--red)">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulse 1s infinite"></span>
+        <span>جاري التسجيل... <b id="room-voice-timer">0:00</b></span>
+        <button onclick="cancelVoiceRecording()" style="margin-right:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px">إلغاء ✕</button>
+      </div>
       <div style="display:flex;gap:8px;align-items:center">
         <input type="file" id="room-file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip" style="display:none" onchange="onRoomFileSelected()">
         <button class="send-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="document.getElementById('room-file').click()" title="إرفاق ملف/صورة/فيديو"><i class="ti ti-paperclip" style="font-size:14px;color:var(--muted)"></i></button>
+        <button class="send-btn" id="room-mic-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="toggleVoice('room')" title="رسالة صوتية"><i class="ti ti-microphone" style="font-size:14px;color:var(--muted)"></i></button>
         <input class="inp" id="room-msg-inp" placeholder="رسالة للغرفة..." style="flex:1" onkeypress="if(event.key==='Enter')sendRoomMsg()">
-        <button class="send-btn" onclick="sendRoomMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
+        <button class="send-btn" id="room-send-btn" onclick="sendRoomMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
       </div>
       <div id="room-file-preview" style="display:none;padding:4px 2px;font-size:10px;color:var(--gold)"></div>
     </div>`;
@@ -2055,7 +2322,7 @@ async function loadRoomChat() {
 
 async function loadRoomMessages() {
   const { data: msgs, error } = await sb.from('elite_messages')
-    .select('*, profiles!elite_messages_sender_id_fkey(full_name,color)')
+    .select('*, profiles!elite_messages_sender_id_fkey(full_name,color,avatar_type,avatar_value,avatar_status)')
     .order('created_at', {ascending: true})
     .limit(50);
   if (error) { console.log('room chat error:', error.message); }
@@ -2064,7 +2331,7 @@ async function loadRoomMessages() {
   box.innerHTML = msgs?.length ? msgs.map(m => {
     const isMe = m.sender_id === currentUser.id;
     return `<div style="display:flex;flex-direction:${isMe?'row-reverse':'row'};gap:6px;align-items:flex-end">
-      <div style="width:24px;height:24px;border-radius:50%;background:${m.profiles?.color||'#29ABE2'}44;color:${m.profiles?.color||'#29ABE2'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${(m.profiles?.full_name||'?')[0]}</div>
+      <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:${m.profiles?.color||'#29ABE2'}44;color:${m.profiles?.color||'#29ABE2'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${avatarHTML(m.profiles)}</div>
       <div>
         <div style="font-size:9px;color:var(--muted);margin-bottom:2px;text-align:${isMe?'left':'right'}">${m.profiles?.full_name||'عضو'}</div>
         <div style="display:flex;align-items:center;gap:4px;flex-direction:${isMe?'row-reverse':'row'}">
@@ -2083,11 +2350,22 @@ async function delRoomMsg(id) {
 }
 
 let pendingRoomFile = null;
-function onRoomFileSelected() {
+async function onRoomFileSelected() {
   const inp = el('room-file');
-  pendingRoomFile = inp.files?.[0] || null;
+  let file = inp.files?.[0] || null;
   const prev = el('room-file-preview');
-  if (pendingRoomFile && prev) { prev.style.display='block'; prev.textContent = '📎 ' + pendingRoomFile.name + ' — هيتبعت مع الرسالة الجاية'; }
+  if (!file) { pendingRoomFile = null; return; }
+  if (file.size > MAX_ATTACH_MB*1024*1024) {
+    alert(`الملف كبير جداً (أكبر من ${MAX_ATTACH_MB} ميجا)، اختار ملف أصغر`);
+    inp.value = ''; pendingRoomFile = null; if (prev) prev.style.display='none';
+    return;
+  }
+  if (file.type.startsWith('image/')) {
+    if (prev) { prev.style.display='block'; prev.textContent = '⏳ جاري تجهيز الصورة...'; }
+    file = await compressImageFile(file);
+  }
+  pendingRoomFile = file;
+  if (prev) { prev.style.display='block'; prev.textContent = '📎 ' + file.name + ' — هيتبعت مع الرسالة الجاية'; }
 }
 
 async function sendRoomMsg() {
@@ -2095,8 +2373,11 @@ async function sendRoomMsg() {
   if (!content.trim() && !pendingRoomFile) return;
   const row = { sender_id: currentUser.id, sender_name: userProfile?.full_name || currentUser.email, content: content.trim() };
   if (pendingRoomFile) {
+    setSendingState(true, 'room');
     const media = await uploadChatMedia(pendingRoomFile, 'room-elite');
-    if (media) { row.media_url = media.url; row.media_type = media.type; }
+    setSendingState(false, 'room');
+    if (!media) return; // فشل الرفع — منبعتش رسالة فاضية
+    row.media_url = media.url; row.media_type = media.type;
     pendingRoomFile = null;
     el('room-file').value = '';
     if (el('room-file-preview')) el('room-file-preview').style.display = 'none';
@@ -2254,11 +2535,13 @@ async function doPromote(id, curXP, maxXP, curLevel) {
 async function loadNotifs() {
   if (isLeader) {
     const { data: pending } = await sb.from('profiles').select('*').eq('status','pending');
+    const avatarPendingCount = await countPendingAvatars();
     const msgs = [];
-    if (pending?.length) msgs.push(`👤 ${pending.length} طلبات انضمام بانتظار الموافقة`);
+    if (pending?.length) msgs.push({text:`👤 ${pending.length} طلبات انضمام بانتظار الموافقة`, action:"navigate('pending');closeModal()"});
+    if (avatarPendingCount) msgs.push({text:`🖼️ ${avatarPendingCount} صورة شخصية بانتظار الموافقة`, action:"reviewAvatarsModal()"});
     showModal(`
       <div class="modal-title">🔔 الإشعارات</div>
-      ${msgs.length ? msgs.map(m=>`<div style="background:rgba(41,171,226,.08);border:1px solid rgba(41,171,226,.2);border-radius:10px;padding:11px;font-size:12px;margin-bottom:8px">${m}</div>`).join('') 
+      ${msgs.length ? msgs.map(m=>`<div onclick="${m.action}" style="cursor:pointer;background:rgba(41,171,226,.08);border:1px solid rgba(41,171,226,.2);border-radius:10px;padding:11px;font-size:12px;margin-bottom:8px">${m.text}</div>`).join('') 
       : '<div class="empty-state"><i class="ti ti-bell-off"></i><p>لا توجد إشعارات جديدة</p></div>'}
       <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إغلاق</button></div>`);
   } else {
@@ -2418,10 +2701,19 @@ window.addEventListener('load', () => {
        band TEXT DEFAULT '',
        color TEXT DEFAULT '#29ABE2',
        role TEXT DEFAULT 'member',
+       avatar_type TEXT DEFAULT 'emoji',      -- 'emoji' أو 'photo'
+       avatar_value TEXT DEFAULT '',          -- الإيموجي نفسه أو رابط الصورة
+       avatar_status TEXT DEFAULT 'approved', -- 'approved' أو 'pending' (لازم موافقة القائد لو صورة)
        created_at TIMESTAMPTZ DEFAULT NOW()
      );
      -- يمنع أي اسمين متطابقين (بتجاهل حالة الأحرف) على مستوى قاعدة البيانات كطبقة حماية إضافية فوق فحص الكود
      CREATE UNIQUE INDEX profiles_full_name_unique_idx ON profiles (LOWER(full_name));
+
+     -- ⚠️ لو الجدول ده متعمل بالفعل عندك (تطبيق شغال قبل كده)، متعملش CREATE TABLE تاني،
+     -- شغل الأسطر دي بس عشان تضيف أعمدة الصورة الشخصية للجدول الموجود:
+     -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_type TEXT DEFAULT 'emoji';
+     -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_value TEXT DEFAULT '';
+     -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_status TEXT DEFAULT 'approved';
 
      -- جدول المهام (type: individual = مهمة فردية لعضو واحد / group = مهمة جماعية للكل)
      CREATE TABLE tasks (
@@ -2588,13 +2880,28 @@ window.addEventListener('load', () => {
      -- messages / elite_messages / tasks / task_submissions / news / profiles / bands
 
      -- ================================================================
-     -- 📎 إعداد تخزين الوسائط (صور/فيديو/صوت/ملفات) في الشات الخاص وشات النخبة
+     -- 📎 إعداد تخزين الوسائط (صور/فيديو/صوت/ملفات + الرسائل الصوتية) في الشات الخاص وشات النخبة
      -- ================================================================
      -- من Supabase Dashboard → Storage → Create a new bucket
      -- اسم الـ bucket: chat-media   |   Public bucket: ✓ مفعّل
      -- بعد إنشاء الـ bucket، روح Storage → Policies وضيف:
      --   INSERT: WITH CHECK (auth.role() = 'authenticated')
      --   SELECT: USING (true)  -- عشان أي حد معاه اللينك يقدر يفتح الميديا بعد ما اتبعتله في شات خاص بيه
+     --
+     -- ⚠️ لو الملفات/الصوت مش بيترسلوا في الشات: السبب الأشهر إن الـ bucket ده مش متعمل أصلاً،
+     -- أو إن الـ Policies فوق دي مش متضافة، أو إن حجم الملف تجاوز الحد المسموح به في إعدادات الـ bucket
+     -- (روح Storage → chat-media → Edit bucket وزوّد "File size limit" لحد 50MB مثلاً).
+     -- دلوقتي أي خطأ رفع هيظهر لصاحب الشات في رسالة واضحة بدل ما يفشل بصمت.
+     -- ================================================================
+
+     -- ================================================================
+     -- 🖼️ إعداد تخزين الصور الشخصية (avatars) — تحتاج موافقة القائد
+     -- ================================================================
+     -- من Supabase Dashboard → Storage → Create a new bucket
+     -- اسم الـ bucket: avatars   |   Public bucket: ✓ مفعّل
+     -- بعد إنشاء الـ bucket، روح Storage → Policies وضيف:
+     --   INSERT: WITH CHECK (auth.role() = 'authenticated')
+     --   SELECT: USING (true)
      -- ================================================================
 
 </body>
