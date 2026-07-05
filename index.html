@@ -84,6 +84,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text)}
 .auth-form{display:none;flex-direction:column;gap:12px}
 .auth-form.active{display:flex}
 .inp{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 14px;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;width:100%;outline:none;transition:border-color .2s}
+.pass-wrap{position:relative}
+.pass-wrap .inp{padding-left:38px}
+.pass-toggle{position:absolute;top:50%;transform:translateY(-50%);left:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px;display:flex;align-items:center;justify-content:center;line-height:1}
+.pass-toggle:hover{color:var(--text)}
 .inp:focus{border-color:var(--blue)}
 textarea.inp{resize:vertical;min-height:75px}
 select.inp{cursor:pointer}
@@ -369,7 +373,7 @@ select.inp{cursor:pointer}
     <!-- LOGIN -->
     <div class="auth-form active" id="form-login">
       <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" id="login-email" type="email" placeholder="example@email.com"></div>
-      <div class="form-group"><label class="form-label">كلمة المرور</label><input class="inp" id="login-pass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')doLogin()"></div>
+      <div class="form-group"><label class="form-label">كلمة المرور</label><div class="pass-wrap"><input class="inp" id="login-pass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')doLogin()"><button type="button" class="pass-toggle" onclick="togglePass('login-pass',this)"><i class="ti ti-eye"></i></button></div></div>
       <div class="auth-err" id="login-err"></div>
       <button class="btn-primary" id="login-btn" onclick="doLogin()">دخول إلى TAM+ 🔥</button>
       <div style="text-align:center;margin-top:12px"><a href="javascript:void(0)" onclick="showForgotForm()" style="font-size:11px;color:var(--blue);text-decoration:none">نسيت كلمة المرور؟</a></div>
@@ -379,7 +383,7 @@ select.inp{cursor:pointer}
     <div class="auth-form" id="form-register">
       <div class="form-group"><label class="form-label">اسم المستخدم (لازم ينتهي بـ TAM)</label><input class="inp" id="reg-name" placeholder="مثال: ExampleTAM"><div style="font-size:9px;color:var(--muted);margin-top:4px;line-height:1.6">حرف أول كابيتال، باقي الاسم سمول، وينتهي إجبارياً بـ TAM كابيتال بالكامل ومتصلة — بدون أرقام أو مسافات. مثال صحيح: <b style="color:var(--gold)">AhmedTAM</b></div></div>
       <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" id="reg-email" type="email" placeholder="example@email.com"></div>
-      <div class="form-group"><label class="form-label">كلمة المرور (8 أحرف على الأقل)</label><input class="inp" id="reg-pass" type="password" placeholder="••••••••"></div>
+      <div class="form-group"><label class="form-label">كلمة المرور (8 أحرف على الأقل)</label><div class="pass-wrap"><input class="inp" id="reg-pass" type="password" placeholder="••••••••"><button type="button" class="pass-toggle" onclick="togglePass('reg-pass',this)"><i class="ti ti-eye"></i></button></div></div>
       <div class="auth-err" id="reg-err"></div>
       <div class="auth-ok" id="reg-ok"></div>
       <button class="btn-primary" id="reg-btn" onclick="doRegister()">إنشاء الحساب</button>
@@ -404,7 +408,7 @@ select.inp{cursor:pointer}
         </div>
         <div style="text-align:center;font-size:11px;color:var(--red);margin-bottom:14px" id="forgot-timer">⏱ الكود صالح لمدة 10:00 دقايق</div>
         <div class="form-group"><label class="form-label">الكود</label><input class="inp" id="forgot-code" maxlength="6" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="------" style="letter-spacing:8px;text-align:center;font-size:18px" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)"></div>
-        <div class="form-group"><label class="form-label">كلمة المرور الجديدة (8 أحرف على الأقل)</label><input class="inp" id="forgot-newpass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')verifyResetCode()"></div>
+        <div class="form-group"><label class="form-label">كلمة المرور الجديدة (8 أحرف على الأقل)</label><div class="pass-wrap"><input class="inp" id="forgot-newpass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')verifyResetCode()"><button type="button" class="pass-toggle" onclick="togglePass('forgot-newpass',this)"><i class="ti ti-eye"></i></button></div></div>
         <div class="auth-err" id="forgot-code-err"></div>
         <div class="auth-ok" id="forgot-code-ok"></div>
         <button class="btn-primary" id="forgot-code-btn" onclick="verifyResetCode()">تأكيد وتغيير كلمة المرور</button>
@@ -612,8 +616,8 @@ select.inp{cursor:pointer}
         </div>
         <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:18px">
           <div class="sec-title" style="margin-bottom:12px">تغيير كلمة المرور</div>
-          <div class="form-group"><label class="form-label">كلمة المرور الحالية</label><input class="inp" id="cur-pass" type="password" placeholder="••••••••"></div>
-          <div class="form-group"><label class="form-label">كلمة المرور الجديدة (8 أحرف على الأقل)</label><input class="inp" id="new-pass" type="password" placeholder="••••••••"></div>
+          <div class="form-group"><label class="form-label">كلمة المرور الحالية</label><div class="pass-wrap"><input class="inp" id="cur-pass" type="password" placeholder="••••••••"><button type="button" class="pass-toggle" onclick="togglePass('cur-pass',this)"><i class="ti ti-eye"></i></button></div></div>
+          <div class="form-group"><label class="form-label">كلمة المرور الجديدة (8 أحرف على الأقل)</label><div class="pass-wrap"><input class="inp" id="new-pass" type="password" placeholder="••••••••"><button type="button" class="pass-toggle" onclick="togglePass('new-pass',this)"><i class="ti ti-eye"></i></button></div></div>
           <div class="auth-err" id="chpass-err"></div>
           <div class="auth-ok" id="chpass-ok"></div>
           <button class="btn-primary" style="width:auto;padding:9px 20px;font-size:12px" id="chpass-btn" onclick="changePass()">تغيير</button>
@@ -1125,7 +1129,7 @@ function showResetPasswordScreen() {
       <div style="font-size:36px;margin-bottom:10px">🔑</div>
       <div style="font-size:16px;font-weight:700">تعيين كلمة مرور جديدة</div>
     </div>
-    <div class="form-group"><label class="form-label">كلمة المرور الجديدة (8 أحرف على الأقل)</label><input class="inp" id="recovery-pass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')submitNewPassword()"></div>
+    <div class="form-group"><label class="form-label">كلمة المرور الجديدة (8 أحرف على الأقل)</label><div class="pass-wrap"><input class="inp" id="recovery-pass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')submitNewPassword()"><button type="button" class="pass-toggle" onclick="togglePass('recovery-pass',this)"><i class="ti ti-eye"></i></button></div></div>
     <div class="auth-err" id="recovery-err"></div>
     <div class="auth-ok" id="recovery-ok"></div>
     <button class="btn-primary" id="recovery-btn" onclick="submitNewPassword()">حفظ كلمة المرور الجديدة</button>
@@ -3042,6 +3046,19 @@ function timeAgo(dateStr) {
 // ================================================================
 // المفتاح العام (VAPID) — لازم يطابق المفتاح الخاص المحفوظ في Supabase Edge Function
 const VAPID_PUBLIC_KEY = 'BDFQKj75tiXK-xRxLtfBtKqB6LjiMdPLy6tlg8ux2J3Teyewwf4id7xnIW2_hIe00VPVruiVCvb09T0clCHht0A';
+
+function togglePass(id, btn) {
+  const inp = document.getElementById(id);
+  const icon = btn.querySelector('i');
+  if (!inp) return;
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    icon.className = 'ti ti-eye-off';
+  } else {
+    inp.type = 'password';
+    icon.className = 'ti ti-eye';
+  }
+}
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
