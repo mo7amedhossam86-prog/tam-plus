@@ -213,13 +213,13 @@ select.inp{cursor:pointer}
 .chat-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
 .chat-name{font-size:12px;font-weight:600}
 .chat-prev{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
-.chat-window{display:flex;flex-direction:column}
-.chat-top{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--surface)}
-.chat-msgs{flex:1;padding:13px;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;display:flex;flex-direction:column;gap:7px}
+.chat-window{display:flex;flex-direction:column;min-height:0;height:100%}
+.chat-top{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--surface);flex-shrink:0}
+.chat-msgs{flex:1;min-height:0;padding:13px;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;display:flex;flex-direction:column;gap:7px}
 .msg{max-width:70%;padding:8px 12px;border-radius:12px;font-size:12px;line-height:1.5}
 .msg.sent{background:linear-gradient(135deg,var(--blue),#1566A8);color:#fff;align-self:flex-end;border-radius:12px 12px 3px 12px}
 .msg.recv{background:var(--surface);border:1px solid var(--border);align-self:flex-start;border-radius:12px 12px 12px 3px}
-.chat-inp-row{padding:9px 13px;border-top:1px solid var(--border);display:flex;gap:6px;align-items:center}
+.chat-inp-row{padding:9px 13px;border-top:1px solid var(--border);display:flex;gap:6px;align-items:center;flex-shrink:0;background:var(--card)}
 .chat-inp{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'Cairo',sans-serif;font-size:12px;outline:none}
 .send-btn{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--blue),#1566A8);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
@@ -1664,7 +1664,7 @@ async function loadGroupTasks() {
       const subsHtml = subs?.length ? subs.map(s => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border)">
           <span style="font-size:11px">${s.user_name} <span style="color:var(--muted);font-size:9px">— ${s.status==='approved'?'✅ مقبولة':s.status==='rejected'?'❌ مرفوضة':'⏳ بانتظار المراجعة'}</span></span>
-          ${s.status==='submitted'?`<div style="display:flex;gap:4px"><button class="bs bg" onclick="approveSubmission('${s.id}','${t.id}','${s.user_id}',${t.xp})">✓ قبول</button><button class="bs br" onclick="rejectSubmission('${s.id}','${t.id}')">✕ رفض</button></div>`:''}
+          ${s.status==='submitted'?`<div style="display:flex;gap:4px"><button class="bs bg" onclick="approveSubmission('${s.id}','${t.id}','${s.user_id}',${t.xp})">✓ قبول</button><button class="bs br" onclick="rejectSubmission('${s.id}','${t.id}','${s.user_id}')">✕ رفض</button></div>`:''}
         </div>`).join('') : '<div style="font-size:10px;color:var(--muted);padding:6px 0">لا يوجد مقدّمين حتى الآن</div>';
       return `<div class="task-card" style="margin-bottom:10px">
         <div class="task-title">${t.title}</div>
@@ -1719,14 +1719,17 @@ async function approveSubmission(subId, taskId, userId, xp) {
     if (promoted) {
       const chatKey = [currentUser.id, userId].sort().join('_');
       await sb.from('messages').insert({ chat_key: chatKey, sender_id: currentUser.id, receiver_id: userId, content: '🎉 تهانينا ' + (prof.full_name||'') + '! لقد ترقيت إلى ' + rankMsg + ' في TAM+ 👑' });
+      sendPushTo(userId, '🎉 ترقية جديدة!', 'تهانينا! ترقيت إلى ' + rankMsg, '/');
     }
   }
   await sb.from('task_submissions').update({status:'approved'}).eq('id', subId);
+  sendPushTo(userId, '✅ تمت الموافقة على مشاركتك', 'مشاركتك في المهمة الجماعية اتقبلت — حصلت على +' + xp + ' XP', '/');
   loadGroupTasks(); loadMembers(); loadDashboard();
 }
 
-async function rejectSubmission(subId, taskId) {
+async function rejectSubmission(subId, taskId, userId) {
   await sb.from('task_submissions').update({status:'rejected'}).eq('id', subId);
+  if (userId) sendPushTo(userId, '❌ رفض المشاركة', 'تم رفض مشاركتك في المهمة الجماعية، كلم القائد لو محتاج توضيح', '/');
   loadGroupTasks();
 }
 
@@ -2545,12 +2548,14 @@ async function addTask() {
     // مهمة جماعية — تظهر لكل الأعضاء، بدون تكليف شخص بعينه، وتبدأ نشطة فوراً
     const { error } = await sb.from('tasks').insert({ title, assignee_id: null, assignee_name: '👥 مهمة جماعية', xp, status:'active', type:'group' });
     if (error) { alert('خطأ في إضافة المهمة: ' + error.message); return; }
+    sendPushToAll('👥 مهمة جماعية جديدة', title, '/');
   } else {
     const assigneeId = el('t-a')?.value;
     const { data: assignee } = await sb.from('profiles').select('full_name').eq('id', assigneeId).single();
     // تبدأ المهمة الفردية "نشطة" مباشرة عشان العضو يقدر يشتغل عليها ويقفلها بنفسه من غير أي تدخل تاني من القائد
     const { error } = await sb.from('tasks').insert({ title, assignee_id: assigneeId, assignee_name: assignee?.full_name||'', xp, status:'active', type:'individual' });
     if (error) { alert('خطأ في إضافة المهمة: ' + error.message); return; }
+    sendPushTo(assigneeId, '📋 مهمة جديدة', title, '/');
   }
   closeModal(); loadTasks(); loadDashboard(); loadGroupTasks();
 }
@@ -3036,7 +3041,7 @@ function timeAgo(dateStr) {
 //  PUSH NOTIFICATIONS (PWA) — إشعارات حقيقية خارج الموقع
 // ================================================================
 // المفتاح العام (VAPID) — لازم يطابق المفتاح الخاص المحفوظ في Supabase Edge Function
-const VAPID_PUBLIC_KEY = 'BLl0EmM7EouZ-dbEn03Rb0-LnXCoBCH1ZkOjiRBc8xnQkhKhQgRpH2fOS7ATMj6fktyzkIb4jZlNe1jyonVTmA8';
+const VAPID_PUBLIC_KEY = 'BEcD-Bq_ycf1WBwRZLkVgy4dirWca1DyX7FNNDVIa4KuC4x3jiLOdzOiNYEhzyuKc-67u32MTjQ597DJafE8z7c';
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);

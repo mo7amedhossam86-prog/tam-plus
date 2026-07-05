@@ -1,24 +1,9 @@
-// ================================================================
-//  TAM+ Service Worker — لازم يتحط في نفس مجلد index.html بالظبط
-//  (يعني: yourapp.com/sw.js — مش جوه فولدر فرعي)
-// ================================================================
+// sw.js — Service Worker لاستقبال إشعارات Push حتى لو الموقع مقفول
+// لازم يكون في نفس مجلد index.html بالظبط (مش جوه فولدر فرعي)
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
-// لما يوصل Push حقيقي من السيرفر (حتى والموقع مقفول)
-self.addEventListener('push', (event) => {
+self.addEventListener('push', function (event) {
   let data = {};
-  try {
-    data = event.data ? event.data.json() : {};
-  } catch (e) {
-    data = { title: 'TAM+', body: event.data ? event.data.text() : '' };
-  }
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { title: 'TAM+', body: event.data ? event.data.text() : '' }; }
 
   const title = data.title || 'TAM+ 🔔';
   const options = {
@@ -26,28 +11,29 @@ self.addEventListener('push', (event) => {
     icon: './icon-192.png',
     badge: './icon-192.png',
     data: { url: data.url || './' },
-    tag: 'tam-plus-' + Date.now(), // tag فريد عشان الإشعارات المختلفة متبقاش بتلغي بعض
+    tag: 'tam-plus',
     renotify: true,
-    vibrate: [100, 50, 100],
+    dir: 'rtl',
+    lang: 'ar',
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// لما المستخدم يدوس على الإشعار — يفتحله الموقع
-self.addEventListener('notificationclick', (event) => {
+// لما المستخدم يدوس على الإشعار — يفتح الموقع (أو يركّز على التاب المفتوح أصلاً)
+self.addEventListener('notificationclick', function (event) {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || './';
+  const targetUrl = (event.notification.data && event.notification.data.url) || './';
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
-      for (const client of clientsArr) {
-        if ('focus' in client) {
-          if ('navigate' in client) client.navigate(url);
-          return client.focus();
-        }
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) return client.focus();
       }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
+      if (clients.openWindow) return clients.openWindow(targetUrl);
     })
   );
 });
+
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
