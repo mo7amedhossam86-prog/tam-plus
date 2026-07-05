@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0A0C10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TAM+">
+<link rel="manifest" href="manifest.json">
+<title>TAM+ — True Amity Makers Plus</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+<!-- ============================================================
+     🔧 ضع هنا بيانات Supabase بتاعتك
+     1- روح supabase.com → اعمل project جديد
+     2- Settings → API → انسخ Project URL و anon public key
+     3- الصق هنا
+     ============================================================ -->
+<script>
+  const SUPABASE_URL = 'https://hdfxiqsgzttiulsjcrgb.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkZnhpcXNnenR0aXVsc2pjcmdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNDg1MTAsImV4cCI6MjA5MzkyNDUxMH0.T-qHpbGwNP9pOmb6Ipa4lBb6NwLvGUJ2rAg8aG_lCso';
+  const LEADER_EMAIL = 'mo7amedhossam86@leader.com';
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --blue:#29ABE2;--red:#E94B4B;--green:#39C96B;--yellow:#F5E642;
+  --bg:#0A0C10;--surface:#111420;--card:#161B2E;--border:#1E2640;
+  --text:#F0F4FF;--muted:#6B7499;--gold:#FFB300;--xp:#4F8EF7;
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text)}
+@keyframes spinIn{from{transform:scale(0) rotate(-180deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== AUTH SCREEN ===== */
+#auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:24px}
+/* اللوجو SVG */
+.logo-flower{width:160px;height:160px;animation:spinIn 1.1s cubic-bezier(.34,1.56,.64,1) both}
+/* mini flower في التوبار */
+.mp{position:absolute;border-radius:50%;}
+.tam-logo-text{font-size:54px;font-weight:900;letter-spacing:-3px;background:linear-gradient(135deg,var(--blue),var(--green),var(--yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:fadeUp .8s .5s both}
+.tam-logo-sub{font-size:11px;color:var(--muted);letter-spacing:4px;text-transform:uppercase;animation:fadeUp .8s .7s both}
+
+.auth-box{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:28px;width:360px;display:flex;flex-direction:column;gap:0;animation:fadeUp .8s .9s both;box-shadow:0 24px 80px rgba(0,0,0,.6);overflow:hidden}
+.auth-tabs{display:flex;margin-bottom:22px;background:var(--surface);border-radius:12px;padding:4px;gap:4px}
+.auth-tab{flex:1;padding:9px;border-radius:9px;text-align:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);transition:all .2s;border:none;background:transparent;font-family:'Cairo',sans-serif}
+.auth-tab.active{background:var(--card);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.auth-form{display:none;flex-direction:column;gap:12px}
+.auth-form.active{display:flex}
+.inp{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 14px;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;width:100%;outline:none;transition:border-color .2s}
+.inp:focus{border-color:var(--blue)}
+textarea.inp{resize:vertical;min-height:75px}
+select.inp{cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,var(--blue),#1566A8);border:none;border-radius:11px;padding:12px;color:#fff;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;width:100%}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(41,171,226,.35)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.auth-err{color:var(--red);font-size:11px;text-align:center;min-height:16px}
+.auth-ok{color:var(--green);font-size:11px;text-align:center;min-height:16px}
+.pending-notice{background:rgba(255,179,0,.08);border:1px solid rgba(255,179,0,.2);border-radius:11px;padding:12px;font-size:11px;color:var(--gold);text-align:center;line-height:1.6}
+
+/* ===== LOADING ===== */
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:8888;flex-direction:column;gap:16px}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+
+/* ===== APP ===== */
+#app{display:none;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 18px;height:55px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-logo{display:flex;align-items:center;gap:9px;cursor:pointer}
+.mini-flower{width:30px;height:30px;position:relative;flex-shrink:0}
+.mp{position:absolute;width:13px;height:17px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%}
+.mp{position:absolute;width:13px;height:17px;border-radius:50% 50% 50% 50%/65% 65% 35% 35%}
+.mp.b{background:#29ABE2;top:1px;left:1px;transform-origin:bottom right;transform:rotate(-42deg)}
+.mp.r{background:#E94B4B;top:1px;right:1px;transform-origin:bottom left;transform:rotate(42deg)}
+.mp.g{background:#39C96B;bottom:1px;left:1px;transform-origin:top right;transform:rotate(42deg)}
+.mp.y{background:#F5E642;bottom:1px;right:1px;transform-origin:top left;transform:rotate(-42deg)}
+.topbar-name{font-size:20px;font-weight:900;background:linear-gradient(135deg,var(--blue),var(--yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.topbar-right{display:flex;align-items:center;gap:9px}
+.role-badge{padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700}
+.role-leader{background:rgba(255,179,0,.12);border:1px solid rgba(255,179,0,.3);color:var(--gold)}
+.role-member{background:rgba(41,171,226,.12);border:1px solid rgba(41,171,226,.3);color:var(--blue)}
+.notif-btn{width:33px;height:33px;border-radius:10px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative}
+.notif-dot{position:absolute;top:7px;right:7px;width:6px;height:6px;background:var(--red);border-radius:50%;border:1.5px solid var(--surface);animation:pulse 2s infinite}
+.avatar-btn{width:33px;height:33px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--red));display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:700}
+
+.main-layout{display:flex;flex:1;overflow:hidden}
+.sidebar{width:205px;background:var(--surface);border-left:1px solid var(--border);padding:10px 8px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:10px;cursor:pointer;font-size:12px;color:var(--muted);transition:all .15s;border:1px solid transparent;user-select:none}
+.nav-item:hover{background:var(--card);color:var(--text)}
+.nav-item.active{background:rgba(41,171,226,.12);color:var(--blue);border-color:rgba(41,171,226,.2);font-weight:700}
+.nav-item i{font-size:16px;width:18px;text-align:center;flex-shrink:0}
+.nav-divider{height:1px;background:var(--border);margin:6px 4px}
+.nav-section{font-size:9px;color:var(--muted);padding:5px 12px 2px;letter-spacing:1px;text-transform:uppercase}
+
+.content{flex:1;padding:18px 22px;overflow-y:auto}
+.page{display:none}
+.page.active{display:block;animation:fadeUp .22s ease}
+.page-title{font-size:20px;font-weight:900;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.pt-l{display:flex;align-items:center;gap:8px}
+.pt-l i{color:var(--blue)}
+.sec-title{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;text-transform:uppercase}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:14px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sc-b::before{background:var(--blue)}.sc-g::before{background:var(--green)}.sc-y::before{background:var(--yellow)}.sc-r::before{background:var(--red)}
+.stat-num{font-size:24px;font-weight:900;margin-bottom:2px}
+.stat-label{font-size:10px;color:var(--muted)}
+.stat-icon{position:absolute;top:12px;left:12px;font-size:24px;opacity:.07}
+
+/* TABLE */
+.data-table{background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden}
+.t-header{padding:10px 16px;background:var(--surface);font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;display:grid;gap:8px}
+.t-row{padding:11px 16px;border-top:1px solid var(--border);display:grid;gap:8px;align-items:center;transition:background .12s}
+.t-row:hover{background:rgba(255,255,255,.015)}
+.mn-cell{display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px}
+.m-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.r-badge{padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;display:inline-block}
+.xp-wrap{display:flex;align-items:center;gap:5px}
+.xp-bar{height:5px;background:var(--surface);border-radius:3px;flex:1;overflow:hidden;min-width:40px}
+.xp-fill{height:100%;background:linear-gradient(90deg,var(--xp),var(--blue));border-radius:3px}
+.xp-num{font-size:10px;color:var(--muted);white-space:nowrap}
+.act-btns{display:flex;gap:4px}
+.bs{padding:4px 8px;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer;border:none;font-family:'Cairo',sans-serif;transition:all .12s}
+.bg{background:rgba(57,201,107,.15);color:var(--green);border:1px solid rgba(57,201,107,.3)}.bg:hover{background:rgba(57,201,107,.28)}
+.bb{background:rgba(41,171,226,.15);color:var(--blue);border:1px solid rgba(41,171,226,.3)}.bb:hover{background:rgba(41,171,226,.28)}
+.br{background:rgba(233,75,75,.15);color:var(--red);border:1px solid rgba(233,75,75,.3)}.br:hover{background:rgba(233,75,75,.28)}
+.bgold{background:rgba(255,179,0,.15);color:var(--gold);border:1px solid rgba(255,179,0,.3)}.bgold:hover{background:rgba(255,179,0,.28)}
+
+/* TASKS */
+.tasks-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.t-col-head{border-radius:11px 11px 0 0;padding:10px 14px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-bottom:none}
+.t-col-body{background:rgba(0,0,0,.12);border:1px solid var(--border);border-top:none;border-radius:0 0 11px 11px;padding:9px;min-height:170px;display:flex;flex-direction:column;gap:6px}
+.task-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
+.task-title{font-size:11px;font-weight:700;margin-bottom:4px;line-height:1.4}
+.task-meta{display:flex;align-items:center;justify-content:space-between;margin-top:7px}
+.task-xp{font-size:10px;padding:2px 7px;border-radius:9px;background:rgba(79,142,247,.15);color:var(--xp);font-weight:700}
+.add-task-btn{background:rgba(41,171,226,.07);border:1px dashed rgba(41,171,226,.22);border-radius:8px;padding:8px;color:var(--blue);font-size:11px;cursor:pointer;text-align:center;font-family:'Cairo',sans-serif;transition:all .15s}
+.add-task-btn:hover{background:rgba(41,171,226,.14)}
+.col-cnt{font-size:10px;padding:2px 6px;border-radius:7px;background:var(--surface)}
+
+/* MY TASKS (member view) */
+.my-task-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+.my-task-title{font-size:14px;font-weight:700;margin-bottom:6px}
+.my-task-status{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.st-pending{background:rgba(107,116,153,.15);color:var(--muted)}
+.st-active{background:rgba(41,171,226,.15);color:var(--blue)}
+.st-done{background:rgba(57,201,107,.15);color:var(--green)}
+
+/* RANKS */
+.rank-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.rank-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:16px;text-align:center;transition:transform .15s,border-color .2s}
+.rank-card:hover{transform:translateY(-3px);border-color:var(--blue)}
+.rank-card.mc{border-color:rgba(255,179,0,.22);background:linear-gradient(135deg,rgba(255,179,0,.04),var(--card))}
+.rank-icon{font-size:30px;margin-bottom:6px}
+.rank-name{font-size:13px;font-weight:700;margin-bottom:2px}
+.rank-xp{font-size:10px;color:var(--muted)}
+.rank-levels{display:flex;gap:3px;justify-content:center;margin-top:7px}
+.lvl-dot{width:6px;height:6px;border-radius:50%;background:var(--border)}
+
+/* NEWS */
+.news-list{display:flex;flex-direction:column;gap:10px}
+.news-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:16px;display:flex;gap:12px;transition:border-color .15s}
+.news-card:hover{border-color:var(--blue)}
+.news-ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.news-title{font-size:13px;font-weight:700;margin-bottom:3px}
+.news-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.news-foot{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.news-time{font-size:10px;color:var(--muted)}
+.news-tag{font-size:10px;padding:2px 7px;border-radius:8px;font-weight:700}
+
+/* CHAT */
+.chat-layout{display:grid;grid-template-columns:230px 1fr;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;height:460px}
+.chat-list{border-left:1px solid var(--border);overflow-y:auto}
+.chat-item{padding:11px 13px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:background .12s;border-bottom:1px solid var(--border)}
+.chat-item:hover,.chat-item.active{background:rgba(41,171,226,.07)}
+.chat-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.chat-name{font-size:12px;font-weight:600}
+.chat-prev{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.chat-window{display:flex;flex-direction:column}
+.chat-top{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--surface)}
+.chat-msgs{flex:1;padding:13px;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
+.msg{max-width:70%;padding:8px 12px;border-radius:12px;font-size:12px;line-height:1.5}
+.msg.sent{background:linear-gradient(135deg,var(--blue),#1566A8);color:#fff;align-self:flex-end;border-radius:12px 12px 3px 12px}
+.msg.recv{background:var(--surface);border:1px solid var(--border);align-self:flex-start;border-radius:12px 12px 12px 3px}
+.chat-inp-row{padding:9px 13px;border-top:1px solid var(--border);display:flex;gap:6px;align-items:center}
+.chat-inp{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'Cairo',sans-serif;font-size:12px;outline:none}
+.send-btn{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--blue),#1566A8);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ROOM */
+.room-hero{background:linear-gradient(135deg,rgba(255,179,0,.07),rgba(255,179,0,.02));border:1px solid rgba(255,179,0,.18);border-radius:14px;padding:20px;margin-bottom:14px}
+.room-ico{width:44px;height:44px;border-radius:12px;background:rgba(255,179,0,.13);display:flex;align-items:center;justify-content:center;font-size:21px}
+.code-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;margin-top:11px}
+.code-val{font-size:16px;font-weight:900;letter-spacing:4px;color:var(--gold)}
+.copy-btn{background:rgba(255,179,0,.13);border:1px solid rgba(255,179,0,.28);border-radius:8px;padding:5px 12px;color:var(--gold);font-size:11px;font-weight:700;cursor:pointer;font-family:'Cairo',sans-serif}
+
+/* RULES */
+.rules-box{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:18px}
+.rule-row{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+.rule-row:last-child{border-bottom:none}
+.rule-num{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--blue),var(--green));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.rule-text{font-size:12px;line-height:1.7;flex:1}
+.rule-acts{display:flex;gap:4px;flex-shrink:0}
+.rule-btn{width:24px;height:24px;border-radius:6px;background:var(--surface);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .15s}
+.rule-btn:hover{border-color:var(--blue)}
+
+/* BANDS */
+.bands-wrap{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+.band-tag{padding:5px 13px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid}
+
+/* SETTINGS */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.settings-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:18px}
+.settings-card h4{font-size:13px;font-weight:700;margin-bottom:14px;color:var(--muted)}
+.form-group{margin-bottom:11px}
+.form-label{font-size:10px;color:var(--muted);margin-bottom:4px;display:block;font-weight:700}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+
+/* PROFILE (member) */
+.profile-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;text-align:center;margin-bottom:16px}
+.profile-av-big{width:80px;height:80px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700}
+.profile-name{font-size:20px;font-weight:700;margin-bottom:4px}
+.profile-rank{font-size:13px;color:var(--muted);margin-bottom:12px}
+.profile-xp-bar{height:8px;background:var(--surface);border-radius:4px;overflow:hidden;margin-bottom:6px}
+.profile-xp-fill{height:100%;background:linear-gradient(90deg,var(--xp),var(--blue));border-radius:4px;transition:width .5s}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:9000;backdrop-filter:blur(5px)}
+.modal-box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;width:420px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.7)}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:16px}
+.modal-btns{display:flex;gap:8px;margin-top:16px}
+.btn-cancel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;color:var(--muted);font-family:'Cairo',sans-serif;font-size:12px;cursor:pointer;flex:1;transition:all .15s}
+.btn-cancel:hover{border-color:var(--blue);color:var(--text)}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-state i{font-size:48px;opacity:.3;display:block;margin-bottom:12px}
+.empty-state p{font-size:13px}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ===== MOBILE ===== */
+@media(max-width:768px){
+  html,body{overflow:auto!important;height:auto!important}
+  #auth-screen{position:relative;min-height:100vh;overflow-y:auto;justify-content:flex-start;padding:30px 0}
+  .auth-box{overflow:visible!important}
+  html,body{overflow:auto}
+  #app{height:auto;min-height:100vh}
+  .topbar{padding:0 12px;height:50px}
+  .topbar-name{font-size:16px}
+  .role-badge{font-size:9px;padding:3px 8px}
+  .main-layout{flex-direction:column-reverse}
+  .sidebar{width:100%;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:6px;gap:4px;border-left:none;border-top:1px solid var(--border);flex-wrap:nowrap;flex-shrink:0;order:2}
+  .nav-section{display:none}
+  .nav-divider{width:1px;height:auto;margin:2px;background:var(--border)}
+  .nav-item{flex-direction:column;gap:2px;padding:6px 10px;font-size:9px;min-width:60px;text-align:center;border-radius:10px;white-space:nowrap}
+  .nav-item i{width:auto;font-size:18px}
+  .nav-item span{font-size:9px}
+  .content{flex:1;padding:12px;overflow-y:auto;order:1}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .stat-num{font-size:20px}
+  .tasks-grid{grid-template-columns:1fr}
+  .rank-grid{grid-template-columns:repeat(2,1fr)}
+  .settings-grid{grid-template-columns:1fr}
+  .chat-layout{grid-template-columns:1fr;height:auto}
+  .chat-list{border-left:none;border-bottom:1px solid var(--border);max-height:150px}
+  .chat-window{height:350px}
+  .auth-box{width:95vw;padding:20px}
+  .page-title{font-size:16px}
+  .data-table{overflow-x:auto}
+  .t-header,.t-row{font-size:10px}
+  .modal-box{width:95vw;padding:16px}
+  .form-row{grid-template-columns:1fr}
+  #page-dashboard > div:last-child{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="font-size:12px;color:var(--muted)">جاري التحميل...</div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" style="display:none">
+  <svg class="logo-flower" viewBox="0 0 680 450" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="200" cy="110" rx="75" ry="100" fill="#29ABE2" transform="rotate(-38 200 110)"/>
+    <ellipse cx="420" cy="110" rx="75" ry="100" fill="#E94B4B" transform="rotate(38 420 110)"/>
+    <ellipse cx="200" cy="320" rx="75" ry="100" fill="#39C96B" transform="rotate(38 200 320)"/>
+    <ellipse cx="420" cy="320" rx="75" ry="100" fill="#F5E642" transform="rotate(-38 420 320)"/>
+  </svg>
+  <div style="text-align:center">
+    <div class="tam-logo-text">+TAM</div>
+    <div class="tam-logo-sub">True Amity Makers Plus</div>
+  </div>
+  <div class="auth-box">
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">تسجيل الدخول</button>
+      <button class="auth-tab" onclick="switchTab('register')">حساب جديد</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="auth-form active" id="form-login">
+      <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" id="login-email" type="email" placeholder="example@email.com"></div>
+      <div class="form-group"><label class="form-label">كلمة المرور</label><input class="inp" id="login-pass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')doLogin()"></div>
+      <div class="auth-err" id="login-err"></div>
+      <button class="btn-primary" id="login-btn" onclick="doLogin()">دخول إلى TAM+ 🔥</button>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="auth-form" id="form-register">
+      <div class="form-group"><label class="form-label">الاسم الكامل</label><input class="inp" id="reg-name" placeholder="اسمك كامل"></div>
+      <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" id="reg-email" type="email" placeholder="example@email.com"></div>
+      <div class="form-group"><label class="form-label">كلمة المرور (8 أحرف على الأقل)</label><input class="inp" id="reg-pass" type="password" placeholder="••••••••"></div>
+      <div class="auth-err" id="reg-err"></div>
+      <div class="auth-ok" id="reg-ok"></div>
+      <button class="btn-primary" id="reg-btn" onclick="doRegister()">إنشاء الحساب</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo" onclick="navigate('dashboard')">
+      <svg class="mini-flower" viewBox="0 0 680 450" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="200" cy="110" rx="75" ry="100" fill="#29ABE2" transform="rotate(-38 200 110)"/>
+        <ellipse cx="420" cy="110" rx="75" ry="100" fill="#E94B4B" transform="rotate(38 420 110)"/>
+        <ellipse cx="200" cy="320" rx="75" ry="100" fill="#39C96B" transform="rotate(38 200 320)"/>
+        <ellipse cx="420" cy="320" rx="75" ry="100" fill="#F5E642" transform="rotate(-38 420 320)"/>
+      </svg>
+      <div class="topbar-name">+TAM</div>
+    </div>
+    <div class="topbar-right">
+      <span class="role-badge" id="top-role-badge"></span>
+      <div class="notif-btn" id="notif-btn" onclick="loadNotifs()" style="display:none">
+        <i class="ti ti-bell" style="font-size:16px;color:var(--muted)"></i>
+        <div class="notif-dot" id="notif-dot" style="display:none"></div>
+        <span id="notif-count" style="display:none;position:absolute;top:-4px;left:-4px;background:var(--red);color:#fff;border-radius:10px;padding:0 5px;font-size:9px;font-weight:700;min-width:16px;text-align:center"></span>
+      </div>
+      <div class="avatar-btn" id="top-av" onclick="navigate('profile')">?</div>
+    </div>
+  </div>
+
+  <div class="main-layout">
+    <!-- SIDEBAR - يتغير حسب الدور -->
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-layout-dashboard"></i>لوحة القيادة</div></div>
+        <div class="stats-grid">
+          <div class="stat-card sc-b"><div class="stat-icon"><i class="ti ti-users"></i></div><div class="stat-num" id="s-members">-</div><div class="stat-label">إجمالي الأعضاء</div></div>
+          <div class="stat-card sc-g"><div class="stat-icon"><i class="ti ti-checklist"></i></div><div class="stat-num" id="s-tasks">-</div><div class="stat-label">مهام نشطة</div></div>
+          <div class="stat-card sc-y"><div class="stat-icon"><i class="ti ti-trophy"></i></div><div class="stat-num" id="s-masters">-</div><div class="stat-label">Masters في الفريق</div></div>
+          <div class="stat-card sc-r"><div class="stat-icon"><i class="ti ti-news"></i></div><div class="stat-num" id="s-news">-</div><div class="stat-label">أخبار منشورة</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px">
+          <div><div class="sec-title">🔥 أفضل الأعضاء XP</div><div class="data-table"><div id="dash-top"></div></div></div>
+          <div><div class="sec-title">📋 آخر المهام</div><div class="data-table"><div id="dash-tasks-list"></div></div></div>
+        </div>
+      </div>
+
+      <!-- MEMBERS (leader only) -->
+      <div class="page" id="page-members">
+        <div class="page-title">
+          <div class="pt-l"><i class="ti ti-users"></i>إدارة الأعضاء</div>
+          <div style="display:flex;gap:8px" id="pending-members-btn"></div>
+        </div>
+        <div class="data-table">
+          <div class="t-header" style="grid-template-columns:2fr 1.3fr .7fr 1.5fr .9fr 1.5fr"><span>الاسم</span><span>الرتبة</span><span>المستوى</span><span>XP</span><span>الحالة</span><span>إجراءات</span></div>
+          <div id="members-list"></div>
+        </div>
+      </div>
+
+      <!-- PENDING MEMBERS (leader only) -->
+      <div class="page" id="page-pending">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-user-check"></i>طلبات الانضمام</div></div>
+        <div class="data-table">
+          <div class="t-header" style="grid-template-columns:2fr 2fr 1fr"><span>الاسم</span><span>البريد الإلكتروني</span><span>إجراء</span></div>
+          <div id="pending-list"></div>
+        </div>
+      </div>
+
+      <!-- TASKS (leader) -->
+      <div class="page" id="page-tasks">
+        <div class="page-title">
+          <div class="pt-l"><i class="ti ti-checklist"></i>المهام</div>
+          <button class="btn-primary" style="width:auto;padding:8px 16px;font-size:12px" onclick="showAddTask()">+ مهمة جديدة</button>
+        </div>
+        <div class="tasks-grid">
+          <div><div class="t-col-head" style="border-top:3px solid var(--muted)"><span>⏳ معلقة</span><span class="col-cnt" id="cnt-p"></span></div><div class="t-col-body" id="col-p"></div></div>
+          <div><div class="t-col-head" style="border-top:3px solid var(--blue)"><span>🔄 جارية</span><span class="col-cnt" id="cnt-a"></span></div><div class="t-col-body" id="col-a"></div></div>
+          <div><div class="t-col-head" style="border-top:3px solid var(--green)"><span>✅ مكتملة</span><span class="col-cnt" id="cnt-d"></span></div><div class="t-col-body" id="col-d"></div></div>
+        </div>
+      </div>
+
+      <!-- MY TASKS (member) -->
+      <div class="page" id="page-mytasks">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-checklist"></i>مهامي</div></div>
+        <div id="my-tasks-list"></div>
+      </div>
+
+      <!-- RANKS -->
+      <div class="page" id="page-ranks">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-trophy"></i>نظام الرتب والمستويات</div></div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:14px;margin-bottom:16px;font-size:11px;color:var(--muted);line-height:1.9">
+          🎮 كل رتبة تحتوي على <b style="color:var(--blue)">3 مستويات</b> — L1: <b style="color:var(--blue)">50 XP</b> — L2: <b style="color:var(--blue)">75 XP</b> — L3: <b style="color:var(--blue)">120 XP</b> — بعد L3 يترقى العضو للرتبة التالية بموافقة القائد
+        </div>
+        <div class="rank-grid" id="rank-grid"></div>
+      </div>
+
+      <!-- NEWS -->
+      <div class="page" id="page-news">
+        <div class="page-title">
+          <div class="pt-l"><i class="ti ti-news"></i>الأخبار</div>
+          <button class="btn-primary" id="add-news-btn" style="width:auto;padding:8px 16px;font-size:12px;display:none" onclick="showAddNews()">+ نشر خبر</button>
+        </div>
+        <div class="news-list" id="news-list"></div>
+      </div>
+
+      <!-- CHAT -->
+      <div class="page" id="page-chat">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-message-circle"></i>الشات الخاص</div></div>
+        <div class="chat-layout">
+          <div class="chat-list" id="chat-list"></div>
+          <div class="chat-window">
+            <div class="chat-top">
+              <div class="chat-av" id="c-av" style="background:linear-gradient(135deg,var(--blue),var(--red))">-</div>
+              <div><div style="font-weight:700;font-size:12px" id="c-name">اختر محادثة</div><div style="font-size:9px;color:var(--green)">🔒 خاص بينك وبين القائد فقط</div></div>
+            </div>
+            <div class="chat-msgs" id="chat-msgs"><div style="text-align:center;color:var(--muted);font-size:11px;margin:auto;padding:20px">اختر محادثة من القائمة</div></div>
+            <div class="chat-inp-row">
+              <input class="chat-inp" id="c-inp" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter')sendMsg()">
+              <button class="send-btn" onclick="sendMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:9px;padding:9px 13px;background:rgba(255,179,0,.05);border:1px solid rgba(255,179,0,.13);border-radius:9px;font-size:10px;color:var(--muted)">🔒 هذه المحادثات خاصة تماماً — لا يستطيع أي عضو الاطلاع على محادثات الآخرين</div>
+      </div>
+
+      <!-- ROOM -->
+      <div class="page" id="page-room">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-shield-star"></i>الغرفة الخاصة</div></div>
+        <div id="room-hero-area"></div>
+        <div class="sec-title">أعضاء الغرفة</div>
+        <div class="data-table"><div id="room-list"></div></div>
+        <div style="margin-top:14px" id="room-join-area"></div>
+      </div>
+
+      <!-- RULES -->
+      <div class="page" id="page-rules">
+        <div class="page-title">
+          <div class="pt-l"><i class="ti ti-gavel"></i>قوانين الفريق</div>
+          <button class="btn-primary" id="add-rule-btn" style="width:auto;padding:8px 16px;font-size:12px;display:none" onclick="showAddRule()">+ قانون جديد</button>
+        </div>
+        <div class="rules-box" id="rules-list"></div>
+      </div>
+
+      <!-- THREATS (bands) -->
+      <div class="page" id="page-bands">
+        <div class="page-title">
+          <div class="pt-l"><i class="ti ti-alert-triangle"></i>نظام التهديدات</div>
+          <button class="btn-primary" id="add-band-btn" style="width:auto;padding:8px 16px;font-size:12px;display:none;background:linear-gradient(135deg,#C0392B,#7B241C)" onclick="showAddBand()">⚠️ إصدار تهديد</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:18px" id="threat-levels-display"></div>
+        <div class="sec-title" style="margin-bottom:8px">🚨 التهديدات النشطة</div>
+        <div class="bands-wrap" id="bands-wrap"></div>
+        <div id="assign-band-area"></div>
+        <div id="my-threats-area"></div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="page" id="page-profile">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-user"></i>ملفي الشخصي</div></div>
+        <div class="profile-card" id="profile-card"></div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:18px">
+          <div class="sec-title" style="margin-bottom:12px">تغيير كلمة المرور</div>
+          <div class="form-group"><label class="form-label">كلمة المرور الجديدة</label><input class="inp" id="new-pass" type="password" placeholder="••••••••"></div>
+          <button class="btn-primary" style="width:auto;padding:9px 20px;font-size:12px" onclick="changePass()">تغيير</button>
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+            <button class="btn-primary" style="background:linear-gradient(135deg,var(--red),#800000)" onclick="doLogout()">تسجيل الخروج</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS (leader only) -->
+      <div class="page" id="page-settings">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-settings"></i>إعدادات القائد</div></div>
+        <div class="settings-grid">
+          <div class="settings-card">
+            <h4>⚡ إعدادات XP</h4>
+            <div class="form-group"><label class="form-label">XP المستوى الأول</label><input class="inp" id="xp1" type="number" value="50"></div>
+            <div class="form-group"><label class="form-label">XP المستوى الثاني</label><input class="inp" id="xp2" type="number" value="75"></div>
+            <div class="form-group"><label class="form-label">XP المستوى الثالث</label><input class="inp" id="xp3" type="number" value="120"></div>
+            <button class="btn-primary" style="margin-top:4px" onclick="saveXP()">حفظ XP</button>
+          </div>
+          <div class="settings-card">
+            <h4>🔑 رمز الغرفة الخاصة</h4>
+            <div id="settings-room-code" style="font-size:18px;font-weight:900;letter-spacing:4px;color:var(--gold);margin:10px 0">جاري التحميل...</div>
+            <button class="btn-primary" style="margin-top:4px;font-size:11px;width:auto;padding:8px 16px" onclick="genCode();loadSettingsRoomCode()">🔄 توليد رمز جديد</button>
+          </div>
+          <div class="settings-card">
+            <h4>👥 إحصائيات الفريق</h4>
+            <div id="settings-stats" style="font-size:12px;color:var(--muted);line-height:2.5">جاري التحميل...</div>
+          </div>
+          <div class="settings-card">
+            <h4>🔒 أمان الموقع</h4>
+            <div style="font-size:11px;color:var(--muted);line-height:2.2">
+              <div>RLS: <b style="color:var(--green)">✓ مفعّل</b></div>
+              <div>الإيميل القائد: <b style="color:var(--gold)">mo7amedhossam86@leader.com</b></div>
+              <div>قاعدة البيانات: <b style="color:var(--text)">Supabase PostgreSQL</b></div>
+              <div>الإصدار: <b style="color:var(--text)">TAM+ v2.1</b></div>
+            </div>
+          </div>
+          <div class="settings-card">
+            <h4>⚠️ إجراءات خطرة</h4>
+            <button class="btn-primary" style="background:linear-gradient(135deg,var(--red),#800000);font-size:11px;margin-bottom:8px" onclick="if(confirm('هل تريد رفض كل الطلبات المعلقة؟'))rejectAllPending()">🗑 رفض كل الطلبات المعلقة</button>
+            <button class="btn-primary" style="background:linear-gradient(135deg,#555,#222);font-size:11px" onclick="exportMembers()">📥 تصدير قائمة الأعضاء</button>
+          </div>
+          <div class="settings-card">
+            <h4>ℹ️ معلومات TAM+</h4>
+            <div style="font-size:11px;color:var(--muted);line-height:2.2">
+              <div>الإصدار: <b style="color:var(--text)">TAM+ v2.1</b></div>
+              <div>Backend: <b style="color:var(--text)">Supabase (PostgreSQL)</b></div>
+              <div>نظام الرتب: <b style="color:var(--text)">Member → MasterX MAX</b></div>
+              <div>الأمان: <b style="color:var(--text)">Row Level Security ✓</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" id="modal-box"></div>
+</div>
+
+<script>
+// ================================================================
+//  SUPABASE INIT
+// ================================================================
+const { createClient } = supabase;
+let sb;
+try {
+  sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch(e) {
+  document.getElementById('loading').innerHTML = '<div style="text-align:center;color:#E94B4B;padding:40px;font-size:14px">⚠️ خطأ في إعداد Supabase<br><small style="color:#6B7499;margin-top:8px;display:block">تأكد من وضع SUPABASE_URL و SUPABASE_KEY الصحيحين في الكود</small></div>';
+}
+
+// ================================================================
+//  STATE
+// ================================================================
+let currentUser = null;
+let userProfile = null;
+let isLeader = false;
+let currentChatUserId = null;
+let chatSubscription = null;
+
+const RANKS = [
+  {n:'Member',i:'🌱',c:'var(--blue)',m:false},
+  {n:'Master',i:'⭐',c:'var(--gold)',m:true},
+  {n:'Master I',i:'🌟',c:'var(--gold)',m:true},
+  {n:'Master II',i:'💫',c:'#FFDD00',m:true},
+  {n:'Master III',i:'🔥',c:'#FF6B35',m:true},
+  {n:'Master IV',i:'💎',c:'#00D4FF',m:true},
+  {n:'Master V',i:'🏆',c:'#9B59B6',m:true},
+  {n:'Master VI',i:'⚡',c:'#E74C3C',m:true},
+  {n:'Master VII',i:'🌊',c:'#2ECC71',m:true},
+  {n:'Master VIII',i:'🦅',c:'#F39C12',m:true},
+  {n:'Master IX',i:'🌙',c:'#8E44AD',m:true},
+  {n:'Master X',i:'👑',c:'var(--gold)',m:true},
+  {n:'MasterX MAX',i:'🌌',c:'#FF00FF',m:true,max:true},
+];
+// مستويات التهديد — من الأشد للأخف
+const THREAT_LEVELS = [
+  { name: 'تهديد أسود',    color: '#111111', border: '#444444', icon: '⬛', label: 'Lv.1 — الأشد خطورة' },
+  { name: 'تهديد بنفسجي', color: '#4B0082', border: '#7B2FBE', icon: '🟣', label: 'Lv.2 — خطير جداً' },
+  { name: 'تهديد أحمر',   color: '#C0392B', border: '#E74C3C', icon: '🔴', label: 'Lv.3 — خطير' },
+  { name: 'تهديد أزرق',   color: '#1A5276', border: '#2E86C1', icon: '🔵', label: 'Lv.4 — تحذير متوسط' },
+  { name: 'تهديد أخضر',   color: '#1E8449', border: '#27AE60', icon: '🟢', label: 'Lv.5 — تحذير خفيف' },
+];
+const BCLRS = ['#111111','#4B0082','#C0392B','#1A5276','#1E8449'];
+const AVATARCLRS = ['#29ABE2','#39C96B','#E94B4B','#F5E642','#9B59B6','#E67E22','#00BCD4','#FF4081','#4CAF50','#FF9800'];
+
+// ================================================================
+//  SUPABASE SETUP - إنشاء الجداول تلقائياً
+// ================================================================
+async function setupDatabase() {
+  // نحاول نقرأ من الجداول - لو مش موجودة بتظهر error
+  // الجداول لازم تتعمل من Supabase Dashboard
+  // هنا بس بنتحقق إنها شغالة
+  try {
+    await sb.from('profiles').select('count').limit(1);
+  } catch(e) {
+    console.log('DB check:', e.message);
+  }
+}
+
+// ================================================================
+//  AUTH
+// ================================================================
+async function init() {
+  if (!sb) return;
+  
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) {
+      currentUser = session.user;
+      await loadUserProfile();
+      showApp();
+    } else {
+      showAuth();
+    }
+  } catch(e) {
+    showAuth();
+  }
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      currentUser = session.user;
+      const ok = await loadUserProfile();
+      if (ok !== false) showApp();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      userProfile = null;
+      isLeader = false;
+      showAuth();
+    }
+  });
+}
+
+async function loadUserProfile() {
+  const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  userProfile = data;
+  isLeader = currentUser.email === LEADER_EMAIL;
+  
+  // القائد — يدخل دايماً بدون أي فحص
+  if (isLeader) return true;
+
+  // عضو في انتظار الموافقة — نعمل signOut ونوريله شاشة الانتظار
+  if (data && data.status === 'pending') {
+    await sb.auth.signOut();
+    hide('loading');
+    hide('app');
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('form-login').style.display = 'none';
+    document.getElementById('form-register').style.display = 'none';
+    document.querySelectorAll('.auth-tab').forEach(t => t.style.display = 'none');
+    document.querySelector('.auth-box').innerHTML = `
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:40px;margin-bottom:12px">⏳</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">في انتظار الموافقة</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:20px">
+          حسابك بانتظار مراجعة القائد<br>
+          <b style="color:var(--gold)">${data.email}</b><br>
+          بعد الموافقة سجل دخولك من جديد
+        </div>
+        <div style="background:rgba(255,179,0,.08);border:1px solid rgba(255,179,0,.2);border-radius:11px;padding:12px;font-size:11px;color:var(--gold);margin-bottom:16px">
+          🔔 بعد موافقة القائد ارجع وسجل دخولك
+        </div>
+        <button class="btn-primary" onclick="location.reload()">العودة لتسجيل الدخول</button>
+      </div>`;
+    return false;
+  }
+
+  // محظور أو غير موجود
+  if (!data || data.status === 'rejected' || data.status === 'inactive') {
+    await sb.auth.signOut();
+    alert('تم رفض طلبك أو تعطيل حسابك. تواصل مع القائد.');
+    showAuth();
+    return false;
+  }
+
+  return true;
+}
+
+function showAuth() {
+  hide('loading');
+  show('auth-screen');
+  hide('app');
+}
+
+function showApp() {
+  hide('loading');
+  hide('auth-screen');
+  show('app');
+  renderSidebar();
+  renderTopbar();
+  renderAll();
+  startRealtimeSubscriptions();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+  document.querySelectorAll('.auth-form').forEach((f,i) => f.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+}
+
+async function doLogin() {
+  const email = v('login-email'), pass = v('login-pass');
+  if (!email || !pass) { setErr('login-err','يرجى ملء جميع الحقول'); return; }
+  setErr('login-err','');
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'جاري الدخول...';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'دخول إلى TAM+ 🔥';
+  if (error) setErr('login-err', getArabicError(error.message));
+}
+
+async function doRegister() {
+  const name = v('reg-name'), email = v('reg-email'), pass = v('reg-pass');
+  if (!name || !email || !pass) { setErr('reg-err','يرجى ملء جميع الحقول'); return; }
+  if (pass.length < 8) { setErr('reg-err','كلمة المرور 8 أحرف على الأقل'); return; }
+  setErr('reg-err',''); setOk('reg-ok','');
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true; btn.textContent = 'جاري الإنشاء...';
+
+  const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
+  
+  if (error) { setErr('reg-err', getArabicError(error.message)); btn.disabled = false; btn.textContent = 'إنشاء الحساب'; return; }
+
+  // إنشاء profile في انتظار موافقة القائد
+  if (data.user) {
+    const isLeaderEmail = email === LEADER_EMAIL;
+    await sb.from('profiles').upsert({
+      id: data.user.id,
+      full_name: name,
+      email: email,
+      rank: 'Member',
+      level: 1,
+      xp: 0,
+      max_xp: 50,
+      status: isLeaderEmail ? 'active' : 'pending',
+      band: '',
+      color: AVATARCLRS[Math.floor(Math.random() * AVATARCLRS.length)],
+      role: isLeaderEmail ? 'leader' : 'member',
+    });
+
+    // لو مش القائد — نعمل signOut فوراً عشان مايدخلش التطبيق
+    if (!isLeaderEmail) {
+      await sb.auth.signOut();
+      btn.disabled = false; btn.textContent = 'إنشاء الحساب';
+      // عرض شاشة الانتظار
+      document.getElementById('form-login').style.display = 'none';
+      document.getElementById('form-register').style.display = 'none';
+      document.querySelectorAll('.auth-tab').forEach(t => t.style.display = 'none');
+      document.querySelector('.auth-box').innerHTML = `
+        <div style="text-align:center;padding:10px 0">
+          <div style="font-size:40px;margin-bottom:12px">⏳</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px">تم إنشاء حسابك!</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:20px">
+            حسابك في انتظار موافقة القائد<br>
+            <b style="color:var(--gold)">${email}</b><br>
+            بعد الموافقة ادخل من تسجيل الدخول
+          </div>
+          <div style="background:rgba(255,179,0,.08);border:1px solid rgba(255,179,0,.2);border-radius:11px;padding:12px;font-size:11px;color:var(--gold);margin-bottom:16px">
+            🔔 راجع الصفحة وسجل دخولك بعد موافقة القائد
+          </div>
+          <button class="btn-primary" onclick="location.reload()">العودة لتسجيل الدخول</button>
+        </div>`;
+      return;
+    }
+  }
+
+  btn.disabled = false; btn.textContent = 'إنشاء الحساب';
+}
+
+async function doLogout() {
+  if (!confirm('تسجيل الخروج؟')) return;
+  if (chatSubscription) { sb.removeChannel(chatSubscription); chatSubscription = null; }
+  await sb.auth.signOut();
+}
+
+async function changePass() {
+  const p = v('new-pass');
+  if (!p || p.length < 8) { alert('كلمة المرور 8 أحرف على الأقل'); return; }
+  const { error } = await sb.auth.updateUser({ password: p });
+  if (error) alert('خطأ: ' + error.message);
+  else { alert('تم تغيير كلمة المرور ✓'); document.getElementById('new-pass').value = ''; }
+}
+
+function getArabicError(msg) {
+  if (msg.includes('Invalid login')) return 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+  if (msg.includes('already registered')) return 'هذا البريد الإلكتروني مسجل مسبقاً';
+  if (msg.includes('password')) return 'كلمة المرور ضعيفة جداً';
+  if (msg.includes('email')) return 'بريد إلكتروني غير صالح';
+  return msg;
+}
+
+// ================================================================
+//  SIDEBAR & TOPBAR
+// ================================================================
+function renderSidebar() {
+  const leaderNav = `
+    <div class="nav-section">القيادة</div>
+    <div class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')"><i class="ti ti-layout-dashboard"></i><span>الرئيسية</span></div>
+    <div class="nav-item" id="nav-members" onclick="navigate('members')"><i class="ti ti-users"></i><span>الأعضاء</span></div>
+    <div class="nav-item" id="nav-pending" onclick="navigate('pending')"><i class="ti ti-user-check"></i><span>طلبات الانضمام</span></div>
+    <div class="nav-item" id="nav-tasks" onclick="navigate('tasks')"><i class="ti ti-checklist"></i><span>المهام</span></div>
+    <div class="nav-item" id="nav-ranks" onclick="navigate('ranks')"><i class="ti ti-trophy"></i><span>الرتب</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">التواصل</div>
+    <div class="nav-item" id="nav-news" onclick="navigate('news')"><i class="ti ti-news"></i><span>الأخبار</span></div>
+    <div class="nav-item" id="nav-chat" onclick="navigate('chat')"><i class="ti ti-message-circle"></i><span>الشات الخاص</span></div>
+    <div class="nav-item" id="nav-room" onclick="navigate('room')"><i class="ti ti-shield-star"></i><span>الغرفة الخاصة</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">الإدارة</div>
+    <div class="nav-item" id="nav-rules" onclick="navigate('rules')"><i class="ti ti-gavel"></i><span>القوانين</span></div>
+    <div class="nav-item" id="nav-bands" onclick="navigate('bands')"><i class="ti ti-alert-triangle"></i><span>التهديدات</span></div>
+    <div class="nav-item" id="nav-settings" onclick="navigate('settings')"><i class="ti ti-settings"></i><span>الإعدادات</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-item" id="nav-profile" onclick="navigate('profile')"><i class="ti ti-user"></i><span>ملفي الشخصي</span></div>
+  `;
+  const memberNav = `
+    <div class="nav-section">القائمة</div>
+    <div class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')"><i class="ti ti-layout-dashboard"></i><span>الرئيسية</span></div>
+    <div class="nav-item" id="nav-mytasks" onclick="navigate('mytasks')"><i class="ti ti-checklist"></i><span>مهامي</span></div>
+    <div class="nav-item" id="nav-ranks" onclick="navigate('ranks')"><i class="ti ti-trophy"></i><span>الرتب</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-item" id="nav-news" onclick="navigate('news')"><i class="ti ti-news"></i><span>الأخبار</span></div>
+    <div class="nav-item" id="nav-chat" onclick="navigate('chat')"><i class="ti ti-message-circle"></i><span>شاتي مع القائد</span></div>
+    <div class="nav-item" id="nav-room" onclick="navigate('room')"><i class="ti ti-shield-star"></i><span>الغرفة الخاصة</span></div>
+    <div class="nav-item" id="nav-rules" onclick="navigate('rules')"><i class="ti ti-gavel"></i><span>قوانين الفريق</span></div>
+    <div class="nav-item" id="nav-bands" onclick="navigate('bands')"><i class="ti ti-alert-triangle"></i><span>تهديداتي</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-item" id="nav-profile" onclick="navigate('profile')"><i class="ti ti-user"></i><span>ملفي الشخصي</span></div>
+  `;
+  document.getElementById('sidebar').innerHTML = isLeader ? leaderNav : memberNav;
+}
+
+function renderTopbar() {
+  const name = userProfile?.full_name || currentUser?.email || '?';
+  document.getElementById('top-av').textContent = name[0].toUpperCase();
+  document.getElementById('top-role-badge').textContent = isLeader ? '👑 القائد الأعلى' : '👤 عضو';
+  document.getElementById('top-role-badge').className = 'role-badge ' + (isLeader ? 'role-leader' : 'role-member');
+  if (isLeader) { show('notif-btn'); }
+  else { show('notif-btn'); }
+}
+
+// ================================================================
+//  NAVIGATE
+// ================================================================
+let lastPendingCount = 0;
+async function checkPendingNotif() {
+  const { data: pending } = await sb.from('profiles').select('id').eq('status','pending');
+  const dot = document.getElementById("notif-dot");
+  const navEl = document.getElementById('nav-pending');
+  const count = pending?.length || 0;
+  if (count > 0) {
+    if (dot) dot.style.display = "block";
+    if (navEl) {
+      const badge = `<i class="ti ti-user-check"></i><span>طلبات الانضمام</span><span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${count}</span>`;
+      navEl.innerHTML = badge;
+    }
+    // إشعار خارجي لو في طلبات جديدة
+    if (count > lastPendingCount) {
+      sendLocalNotif('TAM+ 🔔', `${count - lastPendingCount} طلب انضمام جديد بانتظار موافقتك`);
+    }
+  } else {
+    if (dot) dot.style.display = "none";
+  }
+  lastPendingCount = count;
+}
+
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pg = document.getElementById('page-' + page);
+  const nv = document.getElementById('nav-' + page);
+  if (pg) pg.classList.add('active');
+  if (nv) nv.classList.add('active');
+  
+  // Load data for specific pages
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'members') loadMembers();
+  if (page === 'pending') loadPending();
+  if (page === 'tasks') loadTasks();
+  if (page === 'mytasks') { loadMyTasks(); loadTasks(); }
+  if (page === 'news') loadNews();
+  if (page === 'chat') initChat();
+  if (page === 'room') { loadRoom(); setTimeout(loadRoomChat, 500); }
+  if (page === 'rules') loadRules();
+  if (page === 'bands') loadBands();
+  if (page === 'profile') loadProfile();
+  if (page === 'ranks') renderRanks();
+  if (page === 'settings') { loadSettingsRoomCode(); loadSettingsStats(); }
+}
+let memberNotifs = []; // قائمة الإشعارات للعضو
+
+function startRealtimeSubscriptions() {
+  if (isLeader) {
+    checkPendingNotif();
+    setInterval(checkPendingNotif, 10000);
+    sb.channel("profiles-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+        checkPendingNotif(); loadPending(); loadMembers(); loadDashboard();
+      }).subscribe();
+    sb.channel("tasks-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+        loadTasks(); loadDashboard();
+      }).subscribe();
+    sb.channel("news-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "news" }, () => {
+        loadNews();
+      }).subscribe();
+    sb.channel("messages-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+        loadRoomMessages();
+      }).subscribe();
+  } else {
+    // الأعضاء — realtime لكل حاجة تخصهم
+    sb.channel("my-tasks-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, (payload) => {
+        loadMyTasks();
+        // إشعار لو مهمة جديدة للعضو
+        if (payload.eventType === 'INSERT' && payload.new?.assignee_id === currentUser.id) {
+          addMemberNotif(`📋 مهمة جديدة: ${payload.new.title}`);
+        }
+      }).subscribe();
+    sb.channel("news-member-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "news" }, (payload) => {
+        loadNews();
+        if (payload.eventType === 'INSERT') {
+          addMemberNotif(`📢 خبر جديد: ${payload.new.title}`);
+        }
+      }).subscribe();
+    sb.channel("my-threats-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "bands" }, (payload) => {
+        if (payload.new?.target_id === currentUser.id) {
+          addMemberNotif(`⚠️ تهديد جديد موجه إليك!`);
+          loadBands();
+        }
+      }).subscribe();
+    sb.channel("my-profile-changes")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${currentUser.id}` }, (payload) => {
+        if (payload.new?.rank !== payload.old?.rank) {
+          addMemberNotif(`🎉 تمت ترقيتك إلى ${payload.new.rank}!`);
+        }
+      }).subscribe();
+    sb.channel("room-msg-member")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `chat_key=eq.room-elite` }, () => {
+        loadRoomMessages();
+        addMemberNotif('💬 رسالة جديدة في غرفة النخبة');
+      }).subscribe();
+  }
+}
+
+function addMemberNotif(text) {
+  memberNotifs.unshift({ text, time: new Date() });
+  if (memberNotifs.length > 20) memberNotifs.pop();
+  sendLocalNotif('TAM+ 🔔', text);
+  // تحديث badge الجرس
+  const dot = document.getElementById('notif-dot');
+  const btn = document.getElementById('notif-btn');
+  if (dot) dot.style.display = 'block';
+  if (btn) btn.style.display = 'flex';
+  // badge count
+  const badge = document.getElementById('notif-count');
+  if (badge) { badge.textContent = memberNotifs.length; badge.style.display = 'block'; }
+}
+
+
+function renderAll() {
+  loadDashboard();
+  renderRanks();
+  // Show/hide leader-only elements
+  if (isLeader) {
+    elShow('add-news-btn'); elShow('add-rule-btn'); elShow('add-band-btn');
+  }
+}
+
+// ================================================================
+//  DASHBOARD
+// ================================================================
+async function loadDashboard() {
+  const [membersR, tasksR] = await Promise.all([
+    sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL),
+    sb.from('tasks').select('*').neq('status','done'),
+  ]);
+  const members = membersR.data || [];
+  const tasks = tasksR.data || [];
+  
+  el('s-members').textContent = members.length;
+  el('s-tasks').textContent = tasks.length;
+  el('s-masters').textContent = members.filter(m => m.rank?.includes('Master')).length;
+  const { count } = await sb.from('news').select('*', {count:'exact',head:true});
+  el('s-news').textContent = count || 0;
+
+  // Top members (بدون القائد)
+  const top = [...members].sort((a,b) => b.xp - a.xp).slice(0,5);
+  el('dash-top').innerHTML = top.length ? top.map(m => `
+    <div class="t-row" style="grid-template-columns:2fr 1fr 1fr;cursor:pointer" onclick="navigate('members')">
+      <div class="mn-cell"><div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'}">${(m.full_name||'?')[0]}</div><span>${m.full_name||m.email}</span></div>
+      <span class="r-badge" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)}">${m.rank||'Member'}</span>
+      <span style="color:var(--xp);font-weight:700;font-size:12px">${m.xp||0} XP</span>
+    </div>`).join('') : emptyState('لا يوجد أعضاء بعد');
+
+  // Recent tasks
+  const { data: recentTasks } = await sb.from('tasks').select('*').order('created_at',{ascending:false}).limit(5);
+  el('dash-tasks-list').innerHTML = recentTasks?.length ? recentTasks.map(t => `
+    <div class="t-row" style="grid-template-columns:2fr 1fr 1fr;cursor:pointer" onclick="navigate(isLeader?'tasks':'mytasks')">
+      <span style="font-size:11px;font-weight:600">${t.title}</span>
+      <span class="task-xp">+${t.xp} XP</span>
+      <span style="font-size:10px;color:${t.status==='done'?'var(--green)':t.status==='active'?'var(--blue)':'var(--muted)'}">${t.status==='done'?'✅':t.status==='active'?'🔄':'⏳'}</span>
+    </div>`).join('') : emptyState('لا توجد مهام');
+}
+
+// ================================================================
+//  MEMBERS
+// ================================================================
+async function loadMembers() {
+  if (!isLeader) return;
+  // القائد مش في قائمة الأعضاء
+  const { data: members } = await sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL).order('xp', {ascending:false});
+  el('members-list').innerHTML = members?.length ? members.map(m => `
+    <div class="t-row" style="grid-template-columns:2fr 1.3fr .7fr 1.5fr .9fr 1.5fr">
+      <div class="mn-cell">
+        <div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'}">${(m.full_name||'?')[0]}</div>
+        <div><div>${m.full_name||m.email}</div>${m.band?`<span style="font-size:9px;color:var(--gold)">🏷 ${m.band}</span>`:''}</div>
+      </div>
+      <span class="r-badge" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)}">${m.rank||'Member'}</span>
+      <span style="font-size:13px;font-weight:700">Lv.${m.level||1}</span>
+      <div class="xp-wrap"><div class="xp-bar"><div class="xp-fill" style="width:${Math.min(100,Math.round((m.xp||0)/(m.max_xp||50)*100))}%"></div></div><span class="xp-num">${m.xp||0}/${m.max_xp||50}</span></div>
+      <span style="font-size:11px;color:${m.status==='active'?'var(--green)':'var(--muted)'}">${m.status==='active'?'🟢 نشط':'🔴 غير نشط'}</span>
+      <div class="act-btns">
+        <button class="bs bg" onclick="promoteModal('${m.id}','${m.full_name||m.email}','${m.rank||'Member'}',${m.level||1},${m.xp||0},${m.max_xp||50})">⬆ ترقية</button>
+        <button class="bs bb" onclick="openChatWith('${m.id}','${(m.full_name||m.email).replace(/'/g,"\\'")}','${m.color||'#29ABE2'}')">💬</button>
+        <button class="bs br" onclick="kickMember('${m.id}')">×</button>
+      </div>
+    </div>`).join('') : emptyState('لا يوجد أعضاء نشطون بعد');
+}
+
+async function kickMember(id) {
+  if (!confirm('تعطيل هذا العضو؟')) return;
+  await sb.from('profiles').update({status:'inactive'}).eq('id',id);
+  loadMembers();
+}
+
+// ================================================================
+//  PENDING MEMBERS
+// ================================================================
+async function loadPending() {
+  if (!isLeader) return;
+  const { data: pending } = await sb.from('profiles').select('*').eq('status','pending');
+  el('pending-list').innerHTML = pending?.length ? pending.map(m => `
+    <div class="t-row" style="grid-template-columns:2fr 2fr 1fr">
+      <div class="mn-cell"><div class="m-av" style="background:#29ABE222;color:#29ABE2">${(m.full_name||'?')[0]}</div><span>${m.full_name||'غير معروف'}</span></div>
+      <span style="font-size:11px;color:var(--muted)">${m.email}</span>
+      <div class="act-btns">
+        <button class="bs bg" onclick="approveMember('${m.id}')">✓ قبول</button>
+        <button class="bs br" onclick="rejectMember('${m.id}')">× رفض</button>
+      </div>
+    </div>`).join('') : '<div class="empty-state"><i class="ti ti-user-check"></i><p>لا توجد طلبات انضمام جديدة</p></div>';
+
+  // Badge on sidebar
+  const badge = pending?.length ? `<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-right:auto">${pending.length}</span>` : '';
+  const navEl = document.getElementById('nav-pending');
+  if (navEl) navEl.innerHTML = `<i class="ti ti-user-check"></i><span>طلبات الانضمام</span>${badge}`;
+}
+
+async function approveMember(id) {
+  await sb.from('profiles').update({status:'active'}).eq('id',id);
+  loadPending(); loadMembers();
+  alert('تم قبول العضو ✓');
+}
+async function rejectMember(id) {
+  if (!confirm('رفض هذا الطلب؟')) return;
+  await sb.from('profiles').delete().eq('id',id);
+  loadPending();
+}
+
+// ================================================================
+//  TASKS
+// ================================================================
+async function loadTasks() {
+  const { data: tasks } = await sb.from('tasks').select('*').order('created_at',{ascending:false});
+  const p = (tasks||[]).filter(t=>t.status==='pending');
+  const a = (tasks||[]).filter(t=>t.status==='active');
+  const d = (tasks||[]).filter(t=>t.status==='done');
+  el('cnt-p').textContent = p.length; el('cnt-a').textContent = a.length; el('cnt-d').textContent = d.length;
+
+  const isMyTask = t => t.assignee_id === currentUser.id;
+  const mk = t => `
+    <div class="task-card" style="${isMyTask(t)?'border-color:var(--blue)44':''}" >
+      <div class="task-title">${t.title}</div>
+      <div style="font-size:10px;color:var(--muted)">👤 ${t.assignee_name||'غير محدد'}${isMyTask(t)?' <b style=color:var(--blue)>(أنت)</b>':''}</div>
+      <div class="task-meta">
+        <span class="task-xp">+${t.xp} XP</span>
+        <div style="display:flex;gap:3px">
+          ${t.status!=='done'&&isLeader?`<button class="bs bg" onclick="advTask('${t.id}','${t.status}','${t.assignee_id}',${t.xp})">✓ تقدم</button>`:''}
+          ${t.status==='active'&&isMyTask(t)&&!isLeader?`<button class="bs bg" onclick="memberCompleteTask('${t.id}',${t.xp})">✓ أنهيت</button>`:''}
+          ${isLeader?`<button class="bs br" onclick="delTask('${t.id}')">×</button>`:''}
+        </div>
+      </div>
+    </div>`;
+
+  el('col-p').innerHTML = p.map(mk).join('') + (isLeader?`<button class="add-task-btn" onclick="showAddTask()">+ مهمة جديدة</button>`:'');
+  el('col-a').innerHTML = a.map(mk).join('');
+  el('col-d').innerHTML = d.map(mk).join('');
+}
+
+async function advTask(id, status, assigneeId, xp) {
+  if (status === 'pending') {
+    const { error } = await sb.from('tasks').update({status:'active'}).eq('id',id);
+    if (error) { alert('خطأ: ' + error.message); return; }
+  } else {
+    const { error } = await sb.from('tasks').update({status:'done'}).eq('id',id);
+    if (error) { alert('خطأ: ' + error.message); return; }
+    
+    // Give XP to assignee (not leader)
+    if (assigneeId && assigneeId !== currentUser.id) {
+      const { data: prof } = await sb.from('profiles').select('*').eq('id',assigneeId).single();
+      if (prof && prof.role !== 'leader') {
+        let newXP = (prof.xp||0) + xp;
+        let newLevel = prof.level||1;
+        let newRank = prof.rank||'Member';
+        let newMaxXP = prof.max_xp||50;
+        let promoted = false;
+        let rankMsg = '';
+        const xpPerLevel = [50, 75, 120];
+
+        if (newXP >= newMaxXP) {
+          if (newLevel < 3) {
+            newLevel++;
+            newXP = newXP - newMaxXP;
+            newMaxXP = xpPerLevel[newLevel-1] || 120;
+            rankMsg = 'المستوى ' + newLevel;
+            promoted = true;
+          } else {
+            const ri = RANKS.findIndex(r => r.n === newRank);
+            if (ri >= 0 && ri < RANKS.length - 1) {
+              newRank = RANKS[ri+1].n;
+              newLevel = 1;
+              newXP = 0;
+              newMaxXP = 50;
+              rankMsg = 'رتبة ' + newRank;
+              promoted = true;
+            } else {
+              newXP = newMaxXP;
+            }
+          }
+        }
+
+        await sb.from('profiles').update({xp: newXP, level: newLevel, rank: newRank, max_xp: newMaxXP}).eq('id', assigneeId);
+
+        if (promoted) {
+          // Send congrats message
+          const chatKey = [currentUser.id, assigneeId].sort().join('_');
+          await sb.from('messages').insert({
+            chat_key: chatKey,
+            sender_id: currentUser.id,
+            receiver_id: assigneeId,
+            content: '🎉 تهانينا ' + (prof.full_name||'') + '! لقد ترقيت إلى ' + rankMsg + ' في TAM+ 👑'
+          });
+          alert('🎉 ترقية! ' + (prof.full_name||'') + ' وصل إلى ' + rankMsg);
+        }
+      }
+    }
+  }
+  loadTasks(); loadDashboard(); loadMembers();
+}
+
+async function memberCompleteTask(taskId, xp) {
+  if (!confirm('هل أنهيت هذه المهمة؟')) return;
+  const { error } = await sb.from('tasks').update({status:'done'}).eq('id', taskId).eq('assignee_id', currentUser.id);
+  if (error) { alert('خطأ: ' + error.message); return; }
+  
+  // Give XP to member
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  if (prof) {
+    let newXP = (prof.xp||0) + xp;
+    let newLevel = prof.level||1;
+    let newRank = prof.rank||'Member';
+    let newMaxXP = prof.max_xp||50;
+    let promoted = false;
+    let rankMsg = '';
+    const xpPerLevel = [50, 75, 120];
+    if (newXP >= newMaxXP) {
+      if (newLevel < 3) {
+        newLevel++;
+        newXP = newXP - newMaxXP;
+        newMaxXP = xpPerLevel[newLevel-1]||120;
+        rankMsg = 'المستوى ' + newLevel;
+        promoted = true;
+      } else {
+        const ri = RANKS.findIndex(r => r.n === newRank);
+        if (ri >= 0 && ri < RANKS.length - 1) {
+          newRank = RANKS[ri+1].n;
+          newLevel = 1; newXP = 0; newMaxXP = 50;
+          rankMsg = 'رتبة ' + newRank;
+          promoted = true;
+        } else { newXP = newMaxXP; }
+      }
+    }
+    await sb.from('profiles').update({xp: newXP, level: newLevel, rank: newRank, max_xp: newMaxXP}).eq('id', currentUser.id);
+    if (promoted) alert('🎉 تهانينا! ترقيت إلى ' + rankMsg);
+    else alert('✅ أحسنت! حصلت على ' + xp + ' XP');
+  }
+  loadMyTasks(); loadTasks();
+}
+
+async function delTask(id) {
+  if (!confirm('حذف المهمة؟')) return;
+  await sb.from('tasks').delete().eq('id',id);
+  loadTasks();
+}
+
+async function loadMyTasks() {
+  const { data: tasks } = await sb.from('tasks').select('*').eq('assignee_id', currentUser.id).order('created_at',{ascending:false});
+  el('my-tasks-list').innerHTML = tasks?.length ? tasks.map(t => `
+    <div class="my-task-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div>
+          <div class="my-task-title">${t.title}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px">المكافأة: <b style="color:var(--xp)">+${t.xp} XP</b></div>
+          <span class="my-task-status st-${t.status}">${t.status==='pending'?'⏳ معلقة':t.status==='active'?'🔄 جارية — اشتغل فيها!':'✅ مكتملة — أحسنت!'}</span>
+        </div>
+        ${t.status==='active'?`<button class="bs bg" onclick="memberCompleteTask('${t.id}',${t.xp})" style="flex-shrink:0;padding:8px 14px;font-size:12px">✅ أنهيت!</button>`:''}
+      </div>
+    </div>`).join('') : '<div class="empty-state"><i class="ti ti-checklist"></i><p>لا توجد مهام مسندة إليك بعد</p></div>';
+}
+
+// ================================================================
+//  NEWS
+// ================================================================
+async function loadNews() {
+  const { data: news } = await sb.from('news').select('*').order('created_at',{ascending:false});
+  const ico={green:'📢',blue:'⚙️',red:'⚠️',gold:'🏆'};
+  const clr={green:'var(--green)',blue:'var(--blue)',red:'var(--red)',gold:'var(--gold)'};
+  el('news-list').innerHTML = news?.length ? news.map(n => `
+    <div class="news-card">
+      <div class="news-ico" style="background:${clr[n.tag_color]||'var(--blue)'}1A">${ico[n.tag_color]||'📌'}</div>
+      <div style="flex:1">
+        <div class="news-title">${n.title}</div>
+        <div class="news-desc">${n.content||''}</div>
+        <div class="news-foot">
+          <span class="news-time">${timeAgo(n.created_at)}</span>
+          <div style="display:flex;gap:7px;align-items:center">
+            <span class="news-tag" style="background:${clr[n.tag_color]||'var(--blue)'}1A;color:${clr[n.tag_color]||'var(--blue)'}">${n.tag||'إعلان'}</span>
+            ${isLeader?`<button class="bs bb" onclick="editNews('${n.id}','${n.title.replace(/'/g,"\'")}','${(n.content||'').replace(/'/g,"\'")}','${n.tag_color}')">تعديل</button><button class="bs br" onclick="delNews('${n.id}')">حذف</button>`:''}
+          </div>
+        </div>
+      </div>
+    </div>`).join('') : '<div class="empty-state"><i class="ti ti-news"></i><p>لا توجد أخبار منشورة</p></div>';
+}
+
+async function editNews(id, title, content, tagColor) {
+  showModal(`<div class="modal-title">✏️ تعديل الخبر</div>
+    <div class="form-group"><label class="form-label">العنوان</label><input class="inp" id="en-t" value="${title.replace(/"/g,'&quot;')}"></div>
+    <div class="form-group"><label class="form-label">التفاصيل</label><textarea class="inp" id="en-d">${content}</textarea></div>
+    <div class="form-group"><label class="form-label">النوع</label>
+      <select class="inp" id="en-c">
+        <option value="green" ${tagColor==='green'?'selected':''}>📢 إعلان</option>
+        <option value="blue" ${tagColor==='blue'?'selected':''}>⚙️ تحديث</option>
+        <option value="red" ${tagColor==='red'?'selected':''}>⚠️ تنبيه</option>
+        <option value="gold" ${tagColor==='gold'?'selected':''}>🏆 إنجاز</option>
+      </select></div>
+    <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إلغاء</button><button class="btn-primary" onclick="saveEditNews('${id}')">حفظ</button></div>`);
+}
+
+async function saveEditNews(id) {
+  const title = v('en-t'), content = v('en-d'), tc = el('en-c').value;
+  const tags = {green:'إعلان',blue:'تحديث',red:'تنبيه',gold:'إنجاز'};
+  if (!title) { alert('يرجى إدخال العنوان'); return; }
+  await sb.from('news').update({title, content, tag: tags[tc], tag_color: tc}).eq('id', id);
+  closeModal(); loadNews();
+}
+
+async function delNews(id) {
+  if (!confirm('حذف الخبر؟')) return;
+  await sb.from('news').delete().eq('id',id);
+  loadNews();
+}
+
+// ================================================================
+//  CHAT
+// ================================================================
+async function initChat() {
+  if (isLeader) {
+    const { data: members } = await sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL);
+    if (!members?.length) {
+      el('chat-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px">لا يوجد أعضاء بعد</div>';
+      return;
+    }
+    el('chat-list').innerHTML = members.map(m => `
+      <div class="chat-item" id="chat-item-${m.id}" onclick="openChatWith('${m.id}','${m.full_name||m.email}','${m.color||'#29ABE2'}')">
+        <div class="chat-av" style="background:${m.color||'#29ABE2'}44;color:${m.color||'#29ABE2'}">${(m.full_name||'?')[0].toUpperCase()}</div>
+        <div style="overflow:hidden"><div class="chat-name">${m.full_name||m.email}</div><div class="chat-prev">${m.rank||'Member'}</div></div>
+      </div>`).join('');
+    // Auto open first member
+    if (members[0]) openChatWith(members[0].id, members[0].full_name||members[0].email, members[0].color||'#29ABE2');
+  } else {
+    const { data: leader } = await sb.from('profiles').select('*').eq('email', LEADER_EMAIL).single();
+    if (leader) {
+      el('chat-list').innerHTML = `
+        <div class="chat-item active" onclick="openChatWith('${leader.id}','👑 القائد','var(--gold)')">
+          <div class="chat-av" style="background:rgba(255,179,0,.3);color:var(--gold)">👑</div>
+          <div><div class="chat-name">القائد</div><div class="chat-prev">TAM+ Leader</div></div>
+        </div>`;
+      openChatWith(leader.id, '👑 القائد', 'var(--gold)');
+    } else {
+      el('chat-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px">القائد غير متاح</div>';
+    }
+  }
+}
+
+async function openChatWith(userId, name, color) {
+  currentChatUserId = userId;
+  document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
+  const item = document.getElementById('chat-item-' + userId);
+  if (item) item.classList.add('active');
+  el('c-av').textContent = name[0];
+  el('c-av').style.background = `linear-gradient(135deg,${color},${color}88)`;
+  el('c-name').textContent = name;
+  
+  // Unsubscribe old
+  if (chatSubscription) { sb.removeChannel(chatSubscription); }
+  
+  await loadMessages(userId);
+  
+  // Real-time subscription
+  const chatKey = getChatKey(currentUser.id, userId);
+  chatSubscription = sb.channel('chat-' + chatKey)
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`chat_key=eq.${chatKey}` }, 
+      () => loadMessages(userId))
+    .subscribe();
+  
+  // Update chat list active state
+  document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.chat-item').forEach(i => { if (i.onclick?.toString().includes(userId)) i.classList.add('active'); });
+}
+
+async function loadMessages(otherUserId) {
+  const chatKey = getChatKey(currentUser.id, otherUserId);
+  const { data: msgs } = await sb.from('messages').select('*').eq('chat_key', chatKey).order('created_at');
+  const msgsEl = el('chat-msgs');
+  msgsEl.innerHTML = msgs?.length ? msgs.map(m => {
+    const isMe = m.sender_id === currentUser.id;
+    const canEdit = isLeader;
+    return `<div style="display:flex;flex-direction:${isMe?'row-reverse':'row'};align-items:flex-end;gap:4px">
+      <div class="msg ${isMe?'sent':'recv'}">${m.content}</div>
+      ${canEdit ? `<div style="display:flex;flex-direction:column;gap:2px">
+        <button onclick="editMsg('${m.id}','${m.content.replace(/'/g,"\'").replace(/"/g,'\"')}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--muted);padding:2px" title="تعديل">✏️</button>
+        <button onclick="deleteMsg('${m.id}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--red);padding:2px" title="حذف">🗑</button>
+      </div>` : ''}
+    </div>`;
+  }).join('')
+    : '<div style="text-align:center;color:var(--muted);font-size:11px;margin:auto;padding:20px">ابدأ المحادثة</div>';
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+async function editMsg(id, oldContent) {
+  const newContent = prompt('تعديل الرسالة:', oldContent);
+  if (!newContent || newContent === oldContent) return;
+  await sb.from('messages').update({content: newContent}).eq('id', id);
+  await loadMessages(currentChatUserId);
+}
+
+async function deleteMsg(id) {
+  if (!confirm('حذف هذه الرسالة؟')) return;
+  await sb.from('messages').delete().eq('id', id);
+  await loadMessages(currentChatUserId);
+}
+
+async function sendMsg() {
+  if (!currentChatUserId) { alert('اختر محادثة أولاً'); return; }
+  const inp = el('c-inp');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  inp.value = '';
+  const chatKey = getChatKey(currentUser.id, currentChatUserId);
+  await sb.from('messages').insert({ chat_key: chatKey, sender_id: currentUser.id, receiver_id: currentChatUserId, content: txt });
+  await loadMessages(currentChatUserId);
+}
+
+function getChatKey(id1, id2) {
+  return [id1, id2].sort().join('_');
+}
+
+// ================================================================
+//  ROOM
+// ================================================================
+async function loadRoom() {
+  const { data: settings } = await sb.from('settings').select('value').eq('key','room_code').single();
+  const roomCode = settings?.value || 'TAM-ΩX-0000';
+
+  if (isLeader) {
+    // القائد يشوف الكود دايماً مع أزرار التحكم
+    el('room-hero-area').innerHTML = `
+      <div class="room-hero">
+        <div style="display:flex;align-items:center;gap:11px;margin-bottom:11px">
+          <div class="room-ico">🏰</div>
+          <div><div style="font-size:16px;font-weight:700">غرفة النخبة — TAM+ Elite</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">للمساعدين المختارين من القائد فقط</div></div>
+        </div>
+        <div class="sec-title">رمز الدخول السري (صالح لشخص واحد)</div>
+        <div class="code-box">
+          <div class="code-val" id="room-code">${roomCode}</div>
+          <button class="copy-btn" onclick="copyCode()">📋 نسخ</button>
+        </div>
+        <div style="display:flex;gap:7px;margin-top:11px">
+          <button class="btn-primary" style="width:auto;padding:8px 16px;font-size:11px" onclick="genCode()">🔄 رمز جديد</button>
+          <button class="btn-primary" style="width:auto;padding:8px 16px;font-size:11px;background:linear-gradient(135deg,var(--gold),#BB8800)" onclick="showAddRoom()">+ إضافة مساعد</button>
+        </div>
+      </div>`;
+    el('room-join-area').innerHTML = '';
+
+  } else {
+    // العضو — نتحقق أولاً هل هو في الغرفة
+    const { data: roomMember } = await sb.from('room_members').select('*').eq('user_id', currentUser.id).single();
+
+    if (roomMember) {
+      // ✅ في الغرفة — اخفي كل حاجة متعلقة بالكود
+      el('room-hero-area').innerHTML = `
+        <div class="room-hero">
+          <div style="display:flex;align-items:center;gap:11px;margin-bottom:11px">
+            <div class="room-ico">🏰</div>
+            <div><div style="font-size:16px;font-weight:700">غرفة النخبة — TAM+ Elite</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">أنت عضو مختار في هذه الغرفة</div></div>
+          </div>
+          <div style="background:rgba(57,201,107,.1);border:1px solid rgba(57,201,107,.3);border-radius:10px;padding:11px;font-size:12px;color:var(--green);text-align:center">
+            ✅ مرحباً بك في غرفة النخبة
+          </div>
+        </div>`;
+      el('room-join-area').innerHTML = '';
+      loadRoomChat();
+
+    } else {
+      // ❌ مش في الغرفة — عرض خانة الكود فقط
+      el('room-hero-area').innerHTML = `
+        <div class="room-hero">
+          <div style="display:flex;align-items:center;gap:11px;margin-bottom:11px">
+            <div class="room-ico">🏰</div>
+            <div><div style="font-size:16px;font-weight:700">غرفة النخبة — TAM+ Elite</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">للمساعدين المختارين من القائد فقط</div></div>
+          </div>
+        </div>`;
+      el('room-join-area').innerHTML = `
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:18px">
+          <div class="sec-title" style="margin-bottom:10px">هل عندك رمز الدخول؟</div>
+          <div style="display:flex;gap:8px">
+            <input class="inp" id="join-code" placeholder="TAM-XX-0000" style="flex:1">
+            <button class="btn-primary" style="width:auto;padding:9px 18px;font-size:12px" onclick="joinRoom()">دخول</button>
+          </div>
+        </div>`;
+    }
+  }
+
+  // قائمة أعضاء الغرفة
+  const { data: roomMembers } = await sb.from('room_members').select('*, profiles(full_name, rank, color)');
+  el('room-list').innerHTML = roomMembers?.length ? roomMembers.map(rm => `
+    <div class="t-row" style="grid-template-columns:2fr 1fr 1fr">
+      <div class="mn-cell">
+        <div class="m-av" style="background:${rm.profiles?.color||'#29ABE2'}22;color:${rm.profiles?.color||'#29ABE2'}">${(rm.profiles?.full_name||'?')[0]}</div>
+        <span>${rm.profiles?.full_name||'مجهول'}</span>
+      </div>
+      <span class="r-badge" style="background:rgba(255,179,0,.12);color:var(--gold)">مساعد مختار</span>
+      ${isLeader?`<button class="bs br" onclick="removeFromRoom('${rm.user_id}')">إزالة</button>`:'<span></span>'}
+    </div>`).join('') : '<div class="empty-state"><i class="ti ti-shield"></i><p>الغرفة فارغة</p></div>';
+}
+
+async function genCode() {
+  if (!isLeader) { alert('فقط القائد يستطيع تغيير الرمز'); return; }
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
+  const code = 'TAM-' + Array.from({length:2},()=>c[Math.floor(Math.random()*c.length)]).join('') + 'X-' + Math.floor(1000+Math.random()*9000);
+  await sb.from('settings').upsert({key:'room_code', value:code});
+  await sb.from('settings').upsert({key:'room_code_used', value:'false'});
+  el('room-code').textContent = code;
+  alert('تم توليد رمز جديد ✓ — صالح لشخص واحد فقط');
+}
+
+async function joinRoom() {
+  const code = v('join-code');
+  if (!code) { alert('أدخل الرمز أولاً'); return; }
+
+  const { data: codeData } = await sb.from('settings').select('value').eq('key','room_code').single();
+
+  if (code.trim() !== codeData?.value?.trim()) { 
+    alert('رمز الدخول غير صحيح'); 
+    return; 
+  }
+
+  const { error } = await sb.from('room_members').upsert({ user_id: currentUser.id }, { onConflict: 'user_id' });
+  
+  if (error) { 
+    alert('حدث خطأ: ' + error.message); 
+    return; 
+  }
+
+  // توليد كود جديد تلقائياً للشخص القادم
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
+  const newCode = 'TAM-' + Array.from({length:2},()=>c[Math.floor(Math.random()*c.length)]).join('') + 'X-' + Math.floor(1000+Math.random()*9000);
+  await sb.from('settings').upsert({ key:'room_code', value: newCode });
+
+  await loadRoom();
+}
+
+async function removeFromRoom(userId) {
+  if (!confirm('إزالة من الغرفة؟')) return;
+  await sb.from('room_members').delete().eq('user_id', userId);
+  loadRoom();
+}
+
+function copyCode() {
+  const code = document.getElementById('room-code')?.textContent;
+  if (!code) return;
+  navigator.clipboard?.writeText(code).then(() => alert('تم نسخ الرمز ✓'));
+}
+
+// ================================================================
+//  RULES
+// ================================================================
+async function loadRules() {
+  const { data: rules } = await sb.from('rules').select('*').order('created_at');
+  el('rules-list').innerHTML = rules?.length ? rules.map((r,i) => `
+    <div class="rule-row">
+      <div class="rule-num">${i+1}</div>
+      <div class="rule-text">${r.content}</div>
+      ${isLeader?`<div class="rule-acts">
+        <button class="rule-btn" onclick="editRule('${r.id}','${r.content.replace(/'/g,"\\'")}')">✏️</button>
+        <button class="rule-btn" onclick="delRule('${r.id}')" style="color:var(--red)">🗑</button>
+      </div>`:''}
+    </div>`).join('') : '<div class="empty-state"><i class="ti ti-gavel"></i><p>لا توجد قوانين بعد</p></div>';
+}
+
+async function editRule(id, content) {
+  const t = prompt('تعديل القانون:', content);
+  if (t) { await sb.from('rules').update({content:t}).eq('id',id); loadRules(); }
+}
+async function delRule(id) {
+  if (!confirm('حذف القانون؟')) return;
+  await sb.from('rules').delete().eq('id',id);
+  loadRules();
+}
+
+// ================================================================
+//  THREATS (نظام التهديدات — محل الباندات)
+// ================================================================
+async function loadBands() {
+  // تنظيف الباندات القديمة اللي مالهاش target_id
+  await sb.from('bands').delete().is('target_id', null);
+  const lvlEl = document.getElementById('threat-levels-display');
+  if (lvlEl) {
+    lvlEl.innerHTML = THREAT_LEVELS.map(t => `
+      <div style="background:${t.color}22;border:1px solid ${t.border}55;border-radius:11px;padding:10px;text-align:center">
+        <div style="font-size:20px;margin-bottom:4px">${t.icon}</div>
+        <div style="font-size:10px;font-weight:700;color:${t.border}">${t.name}</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">${t.label}</div>
+      </div>`).join('');
+  }
+
+  // جلب التهديدات النشطة (bands table)
+  const { data: bands } = await sb.from('bands').select('*').order('created_at',{ascending:false});
+
+  if (isLeader) {
+    // القائد يشوف كل التهديدات النشطة
+    el('bands-wrap').innerHTML = bands?.length ? bands.map(b => {
+      const lvl = THREAT_LEVELS.find(t => t.name === b.name) || THREAT_LEVELS[2];
+      return `
+        <div style="background:${lvl.color}18;border:1px solid ${lvl.border}55;border-radius:12px;padding:12px 14px;margin-bottom:8px;width:100%;display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:20px">${lvl.icon}</span>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:${lvl.border}">${lvl.name}</div>
+              <div style="font-size:11px;color:var(--muted)">📩 لـ: <b style="color:var(--text)">${b.target_name||'غير محدد'}</b></div>
+              ${b.message ? `<div style="font-size:10px;color:var(--muted);margin-top:3px">💬 ${b.message}</div>` : ''}
+            </div>
+          </div>
+          <button class="bs br" onclick="delBand('${b.id}')">× إلغاء</button>
+        </div>`;
+    }).join('') : '<div style="color:var(--muted);font-size:12px;padding:12px">لا توجد تهديدات نشطة</div>';
+
+    // فورم إصدار تهديد جديد
+    const { data: members } = await sb.from('profiles').select('id,full_name').eq('status','active').neq('email', LEADER_EMAIL);
+    el('assign-band-area').innerHTML = '';
+    el('my-threats-area').innerHTML = '';
+  } else {
+    // العضو يشوف التهديدات الموجهة ليه فقط
+    el('bands-wrap').innerHTML = '';
+    el('assign-band-area').innerHTML = '';
+    const myThreats = (bands||[]).filter(b => b.target_id === currentUser.id);
+    const myEl = document.getElementById('my-threats-area');
+    if (!myThreats.length) {
+      myEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--green)"><div style="font-size:48px;margin-bottom:12px">✅</div><div style="font-size:14px;font-weight:700">لا يوجد تهديدات موجهة لك</div><div style="font-size:11px;color:var(--muted);margin-top:6px">أنت بأمان — استمر في الأداء الجيد</div></div>';
+    } else {
+      myEl.innerHTML = `
+        <div style="margin-bottom:10px;font-size:12px;color:var(--red);font-weight:700">🚨 يوجد ${myThreats.length} تهديد موجه إليك:</div>
+        ${myThreats.map(b => {
+          const lvl = THREAT_LEVELS.find(t => t.name === b.name) || THREAT_LEVELS[2];
+          return `
+            <div style="background:${lvl.color}22;border:2px solid ${lvl.border};border-radius:14px;padding:16px;margin-bottom:10px;animation:pulse 3s infinite">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <span style="font-size:28px">${lvl.icon}</span>
+                <div>
+                  <div style="font-size:14px;font-weight:700;color:${lvl.border}">${lvl.name}</div>
+                  <div style="font-size:10px;color:var(--muted)">${lvl.label}</div>
+                </div>
+              </div>
+              ${b.message ? `<div style="background:rgba(0,0,0,.3);border-radius:9px;padding:10px;font-size:12px;line-height:1.7;color:var(--text)">💬 ${b.message}</div>` : ''}
+              <div style="font-size:10px;color:var(--muted);margin-top:8px">📅 ${timeAgo(b.created_at)}</div>
+            </div>`;
+        }).join('')}`;
+    }
+  }
+}
+
+async function delBand(id) {
+  if (!confirm('إلغاء هذا التهديد؟')) return;
+  await sb.from('bands').delete().eq('id',id);
+  loadBands();
+}
+
+async function assignBand() {
+  // غير مستخدمة — استُبدلت بـ addBand
+}
+
+// ================================================================
+//  PROFILE
+// ================================================================
+async function loadProfile() {
+  const { data: p } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  if (!p) return;
+  const pct = Math.min(100, Math.round((p.xp||0)/(p.max_xp||50)*100));
+  const rc = rankColor(p.rank);
+  el('profile-card').innerHTML = `
+    <div class="profile-av-big" style="background:${isLeader?'rgba(255,179,0,.2)':p.color+'22'};color:${isLeader?'var(--gold)':p.color||'#29ABE2'}">${(p.full_name||'?')[0]}</div>
+    <div class="profile-name">${p.full_name||'عضو'}</div>
+    <div class="profile-rank">${p.email}</div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:12px">
+      ${isLeader
+        ? `<span class="r-badge" style="background:rgba(255,179,0,.15);color:var(--gold);font-size:13px;padding:4px 14px">👑 القائد الأعلى</span>`
+        : `<span class="r-badge" style="background:${rc}20;color:${rc};font-size:13px">${p.rank||'Member'}</span>
+           <span style="font-size:13px;color:var(--muted)">المستوى ${p.level||1}</span>
+           ${p.band?`<span style="font-size:13px;color:var(--gold)">🏷 ${p.band}</span>`:''}`
+      }
+    </div>
+    ${isLeader ? '' : `
+    <div style="max-width:260px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px"><span>XP</span><span>${p.xp||0}/${p.max_xp||50}</span></div>
+      <div class="profile-xp-bar"><div class="profile-xp-fill" style="width:${pct}%"></div></div>
+    </div>`}
+    ${isLeader?'<div style="margin-top:16px;font-size:13px;color:var(--gold);line-height:1.8">أنت القائد الأعلى لـ TAM+<br><span style="font-size:11px;color:var(--muted)">True Amity Makers Plus</span></div>':''}`;
+}
+
+// ================================================================
+//  RANKS
+// ================================================================
+function renderRanks() {
+  el('rank-grid').innerHTML = RANKS.map(r => `
+    <div class="rank-card ${r.m?'mc':''}">
+      <div class="rank-icon">${r.i}</div>
+      <div class="rank-name" style="color:${r.c}">${r.n}</div>
+      ${r.max?'<div class="rank-xp" style="color:#FF00FF">الرتبة الأسطورية ✨</div>':`<div class="rank-xp">50 → 75 → 120 XP</div><div class="rank-levels">${[0,1,2].map(()=>'<div class="lvl-dot"></div>').join('')}</div>`}
+    </div>`).join('');
+}
+
+// ================================================================
+//  MODALS
+// ================================================================
+function showModal(h) { el('modal-box').innerHTML = h; el('modal').style.display = 'flex'; }
+function closeModal() { el('modal').style.display = 'none'; }
+
+function showAddTask() {
+  // القائد مش في قائمة المكلفين بالمهام
+  sb.from('profiles').select('id,full_name,email').eq('status','active').neq('email', LEADER_EMAIL).then(({data:members}) => {
+    showModal(`<div class="modal-title">📋 مهمة جديدة</div>
+      <div class="form-group"><label class="form-label">عنوان المهمة</label><input class="inp" id="t-t" placeholder="وصف المهمة..."></div>
+      <div class="form-row">
+        <div><label class="form-label">العضو المكلّف</label>
+          <select class="inp" id="t-a">${(members||[]).map(m=>`<option value="${m.id}">${m.full_name||m.email}</option>`).join('')}</select></div>
+        <div><label class="form-label">XP المكافأة</label><input class="inp" id="t-x" type="number" value="20" min="1"></div>
+      </div>
+      <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إلغاء</button><button class="btn-primary" onclick="addTask()">إضافة المهمة</button></div>`);
+  });
+}
+
+async function addTask() {
+  const title = v('t-t'), assigneeId = el('t-a')?.value, xp = parseInt(v('t-x'))||20;
+  if (!title) { alert('يرجى إدخال عنوان المهمة'); return;  }
+  const { data: assignee } = await sb.from('profiles').select('full_name').eq('id', assigneeId).single();
+  const { error } = await sb.from('tasks').insert({ title, assignee_id: assigneeId, assignee_name: assignee?.full_name||'', xp, status:'pending' });
+  if (error) { alert('خطأ في إضافة المهمة: ' + error.message); return; }
+  closeModal(); loadTasks(); loadDashboard();
+}
+
+function showAddNews() {
+  showModal(`<div class="modal-title">📢 نشر خبر جديد</div>
+    <div class="form-group"><label class="form-label">العنوان</label><input class="inp" id="n-t" placeholder="عنوان الخبر"></div>
+    <div class="form-group"><label class="form-label">التفاصيل</label><textarea class="inp" id="n-d" placeholder="محتوى الخبر..."></textarea></div>
+    <div class="form-group"><label class="form-label">النوع</label>
+      <select class="inp" id="n-c"><option value="green">📢 إعلان</option><option value="blue">⚙️ تحديث</option><option value="red">⚠️ تنبيه</option><option value="gold">🏆 إنجاز</option></select></div>
+    <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إلغاء</button><button class="btn-primary" onclick="addNews()">نشر الخبر</button></div>`);
+}
+
+async function addNews() {
+  const title = v('n-t'), content = v('n-d'), tc = el('n-c').value;
+  const tags = {green:'إعلان',blue:'تحديث',red:'تنبيه',gold:'إنجاز'};
+  if (!title) { alert('يرجى إدخال العنوان'); return; }
+  await sb.from('news').insert({ title, content, tag: tags[tc], tag_color: tc });
+  closeModal(); loadNews();
+}
+
+function showAddRule() {
+  showModal(`<div class="modal-title">⚖️ قانون جديد</div>
+    <div class="form-group"><label class="form-label">نص القانون</label><textarea class="inp" id="r-t" placeholder="اكتب القانون..."></textarea></div>
+    <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إلغاء</button><button class="btn-primary" onclick="addRule()">إضافة</button></div>`);
+}
+
+async function addRule() {
+  const t = v('r-t');
+  if (!t) { alert('يرجى كتابة القانون'); return; }
+  await sb.from('rules').insert({content:t});
+  closeModal(); loadRules();
+}
+
+function showAddBand() {
+  sb.from('profiles').select('id,full_name').eq('status','active').neq('email', LEADER_EMAIL).then(({data:members}) => {
+    showModal(`
+      <div class="modal-title">⚠️ إصدار تهديد جديد</div>
+      <div class="form-group">
+        <label class="form-label">العضو المستهدف</label>
+        <select class="inp" id="threat-member">
+          ${(members||[]).map(m=>`<option value="${m.id}" data-name="${m.full_name||m.email}">${m.full_name||m.email}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">مستوى التهديد</label>
+        <select class="inp" id="threat-level">
+          ${THREAT_LEVELS.map(t=>`<option value="${t.name}">${t.icon} ${t.name} — ${t.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">رسالة التهديد (اختياري)</label>
+        <textarea class="inp" id="threat-msg" placeholder="اكتب سبب التهديد أو التحذير..." style="min-height:80px"></textarea>
+      </div>
+      <div style="background:rgba(233,75,75,.07);border:1px solid rgba(233,75,75,.2);border-radius:10px;padding:10px;font-size:11px;color:var(--muted);margin-bottom:4px">
+        🔔 سيصل هذا التهديد للعضو فور دخوله التطبيق
+      </div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">إلغاء</button>
+        <button class="btn-primary" style="background:linear-gradient(135deg,#C0392B,#7B241C)" onclick="addBand()">⚠️ إصدار التهديد</button>
+      </div>`);
+  });
+}
+
+async function addBand() {
+  const memberSel = el('threat-member');
+  const memberId = memberSel?.value;
+  const memberName = memberSel?.options[memberSel.selectedIndex]?.dataset?.name || '';
+  const level = el('threat-level')?.value;
+  const msg = el('threat-msg')?.value?.trim() || '';
+  if (!memberId || !level) { alert('يرجى تحديد العضو ومستوى التهديد'); return; }
+  const { error } = await sb.from('bands').insert({ name: level, target_id: memberId, target_name: memberName, message: msg });
+  if (error) { alert('خطأ: ' + error.message); return; }
+  closeModal();
+  loadBands();
+  alert(`✓ تم إصدار التهديد لـ ${memberName}`);
+}
+
+function showAddRoom() {
+  sb.from('profiles').select('id,full_name').eq('status','active').then(async ({data:members}) => {
+    const {data:existing} = await sb.from('room_members').select('user_id');
+    const existIds = (existing||[]).map(e=>e.user_id);
+    const avail = (members||[]).filter(m => !existIds.includes(m.id) && m.email !== LEADER_EMAIL);
+    if (!avail.length) { alert('جميع الأعضاء موجودون في الغرفة'); return; }
+    showModal(`<div class="modal-title">🛡 إضافة مساعد للغرفة</div>
+      <div class="form-group"><label class="form-label">اختر العضو</label>
+        <select class="inp" id="rm-s">${avail.map(m=>`<option value="${m.id}">${m.full_name||m.id}</option>`).join('')}</select></div>
+      <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إلغاء</button><button class="btn-primary" onclick="addRoom()">إضافة</button></div>`);
+  });
+}
+
+async function addRoom() {
+  const userId = el('rm-s').value;
+  if (!userId) return;
+  const { error } = await sb.from('room_members').upsert({ user_id: userId }, { onConflict: 'user_id' });
+  if (error) { alert('خطأ في الإضافة: ' + error.message); return; }
+  closeModal();
+  loadRoom();
+  alert('✓ تمت إضافة العضو للغرفة مباشرةً');
+}
+
+async function loadRoomChat() {
+  const roomArea = el('room-join-area');
+  if (!roomArea) return;
+  // امنع التكرار
+  if (document.getElementById('room-chat-msgs')) return;
+  roomArea.innerHTML += `
+    <div style="margin-top:16px;background:var(--card);border:1px solid var(--gold)33;border-radius:13px;padding:14px">
+      <div class="sec-title" style="color:var(--gold);margin-bottom:10px">💬 شات الغرفة الخاصة 👑</div>
+      <div id="room-chat-msgs" style="height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px">
+        <div style="text-align:center;color:var(--muted);font-size:11px">جاري تحميل الرسائل...</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="room-msg-inp" placeholder="رسالة للغرفة..." style="flex:1" onkeypress="if(event.key==='Enter')sendRoomMsg()">
+        <button class="send-btn" onclick="sendRoomMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
+      </div>
+    </div>`;
+  await loadRoomMessages();
+  // Realtime للشات
+  sb.channel('room-chat-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `chat_key=eq.room-elite` }, () => {
+      loadRoomMessages();
+    }).subscribe();
+}
+
+async function loadRoomMessages() {
+  const { data: msgs, error } = await sb.from('messages')
+    .select('*, profiles!messages_sender_id_fkey(full_name,color)')
+    .eq('chat_key', 'room-elite')
+    .order('created_at', {ascending: true})
+    .limit(50);
+  if (error) { console.log('room chat error:', error.message); }
+  const box = el('room-chat-msgs');
+  if (!box) return;
+  box.innerHTML = msgs?.length ? msgs.map(m => {
+    const isMe = m.sender_id === currentUser.id;
+    return `<div style="display:flex;flex-direction:${isMe?'row-reverse':'row'};gap:6px;align-items:flex-end">
+      <div style="width:24px;height:24px;border-radius:50%;background:${m.profiles?.color||'#29ABE2'}44;color:${m.profiles?.color||'#29ABE2'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${(m.profiles?.full_name||'?')[0]}</div>
+      <div>
+        <div style="font-size:9px;color:var(--muted);margin-bottom:2px;text-align:${isMe?'left':'right'}">${m.profiles?.full_name||'عضو'}</div>
+        <div style="display:flex;align-items:center;gap:4px;flex-direction:${isMe?'row-reverse':'row'}">
+          <div style="max-width:200px;background:${isMe?'linear-gradient(135deg,var(--blue),#1a7aad)':'var(--surface)'};border:1px solid var(--border);border-radius:${isMe?'12px 2px 12px 12px':'2px 12px 12px 12px'};padding:7px 10px;font-size:11px">${m.content}</div>
+          ${isLeader?`<button onclick="delRoomMsg('${m.id}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--red);opacity:.5;padding:2px" title="حذف">🗑</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('') : '<div style="text-align:center;color:var(--muted);font-size:11px">لا توجد رسائل بعد — ابدأ المحادثة</div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+async function delRoomMsg(id) {
+  await sb.from('messages').delete().eq('id', id);
+  loadRoomMessages();
+}
+
+async function sendRoomMsg() {
+  const content = v('room-msg-inp');
+  if (!content.trim()) return;
+  // chat_key ثابت للغرفة — receiver_id = sender_id عشان الـ RLS يسمح
+  // لكن نحتاج policy خاصة للغرفة — نستخدم القائد كـ receiver
+  const { data: leaderData } = await sb.from('profiles').select('id').eq('email', LEADER_EMAIL).single();
+  const receiverId = leaderData?.id || currentUser.id;
+  const { error } = await sb.from('messages').insert({
+    chat_key: 'room-elite',
+    sender_id: currentUser.id,
+    receiver_id: receiverId,
+    content: content.trim()
+  });
+  if (error) { console.log('send room msg error:', error.message); return; }
+  el('room-msg-inp').value = '';
+  loadRoomMessages();
+}
+
+function promoteModal(id, name, rank, level, xp, maxXp) {
+  const ri = RANKS.findIndex(r => r.n === rank);
+  const pct = Math.min(100, Math.round(xp/maxXp*100));
+  showModal(`<div class="modal-title">⬆ ترقية ${name}</div>
+    <div style="background:var(--surface);border-radius:10px;padding:13px;margin-bottom:13px">
+      <div style="font-size:10px;color:var(--muted)">الرتبة الحالية</div>
+      <div style="font-size:15px;font-weight:700;margin-top:2px">${rank} — المستوى ${level}</div>
+      <div class="xp-wrap" style="margin-top:7px"><div class="xp-bar" style="height:6px"><div class="xp-fill" style="width:${pct}%"></div></div><span class="xp-num">${xp}/${maxXp} XP</span></div>
+    </div>
+    <div class="form-row">
+      <div><label class="form-label">إضافة XP</label><input class="inp" id="pr-x" type="number" value="50" min="0"></div>
+      <div><label class="form-label">الترقية إلى رتبة</label>
+        <select class="inp" id="pr-r">${RANKS.slice(Math.max(0,ri)).map(r=>`<option ${r.n===rank?'selected':''}>${r.n}</option>`).join('')}</select></div>
+    </div>
+    <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إلغاء</button><button class="btn-primary" onclick="doPromote('${id}',${xp},${maxXp},${level})">✓ تأكيد الترقية</button></div>`);
+}
+
+async function doPromote(id, curXP, maxXP, curLevel) {
+  const addXP = parseInt(v('pr-x'))||0;
+  const newRank = el('pr-r').value;
+  let newXP = Math.min(maxXP, curXP + addXP);
+  let newLevel = curLevel;
+  if (newXP >= maxXP && newLevel < 3) { newLevel++; newXP = 0; }
+  await sb.from('profiles').update({rank: newRank, xp: newXP, level: newLevel}).eq('id', id);
+  closeModal(); loadMembers(); loadDashboard();
+  alert(`🎉 تمت ترقية العضو!\nالرتبة: ${newRank}`);
+}
+
+// ================================================================
+//  SETTINGS
+// ================================================================
+async function loadNotifs() {
+  if (isLeader) {
+    const { data: pending } = await sb.from('profiles').select('*').eq('status','pending');
+    const msgs = [];
+    if (pending?.length) msgs.push(`👤 ${pending.length} طلبات انضمام بانتظار الموافقة`);
+    showModal(`
+      <div class="modal-title">🔔 الإشعارات</div>
+      ${msgs.length ? msgs.map(m=>`<div style="background:rgba(41,171,226,.08);border:1px solid rgba(41,171,226,.2);border-radius:10px;padding:11px;font-size:12px;margin-bottom:8px">${m}</div>`).join('') 
+      : '<div class="empty-state"><i class="ti ti-bell-off"></i><p>لا توجد إشعارات جديدة</p></div>'}
+      <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">إغلاق</button></div>`);
+  } else {
+    // إشعارات الأعضاء
+    showModal(`
+      <div class="modal-title">🔔 إشعاراتك</div>
+      ${memberNotifs.length ? memberNotifs.map(n=>`
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 13px;font-size:12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center">
+          <span>${n.text}</span>
+          <span style="font-size:9px;color:var(--muted);margin-right:8px">${timeAgo(n.time)}</span>
+        </div>`).join('')
+      : '<div class="empty-state"><i class="ti ti-bell-off"></i><p>لا توجد إشعارات جديدة</p></div>'}
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">إغلاق</button>
+        ${memberNotifs.length?`<button class="btn-primary" style="font-size:12px" onclick="memberNotifs=[];document.getElementById('notif-dot').style.display='none';document.getElementById('notif-count').style.display='none';closeModal()">مسح الكل</button>`:''}
+      </div>`);
+    // إخفاء الـ badge بعد الفتح
+    const dot = document.getElementById('notif-dot');
+    const badge = document.getElementById('notif-count');
+    if (dot) dot.style.display = 'none';
+    if (badge) badge.style.display = 'none';
+  }
+}
+
+function saveXP() { alert(`تم حفظ إعدادات XP ✓\nL1: ${v('xp1')}\nL2: ${v('xp2')}\nL3: ${v('xp3')}`); }
+
+async function loadSettingsRoomCode() {
+  const { data } = await sb.from('settings').select('value').eq('key','room_code').single();
+  const el2 = el('settings-room-code');
+  if (el2) el2.textContent = data?.value || 'TAM-ΩX-0000';
+}
+
+async function loadSettingsStats() {
+  const { data: members } = await sb.from('profiles').select('status,role');
+  const active = (members||[]).filter(m => m.status === 'active').length;
+  const pending = (members||[]).filter(m => m.status === 'pending').length;
+  const { data: tasks } = await sb.from('tasks').select('status');
+  const doneTasks = (tasks||[]).filter(t => t.status === 'done').length;
+  const el2 = el('settings-stats');
+  if (el2) el2.innerHTML = `
+    <div>الأعضاء النشطين: <b style="color:var(--green)">${active}</b></div>
+    <div>طلبات معلقة: <b style="color:var(--red)">${pending}</b></div>
+    <div>مهام مكتملة: <b style="color:var(--blue)">${doneTasks}</b></div>
+  `;
+}
+
+async function rejectAllPending() {
+  const { data: pending } = await sb.from('profiles').select('id').eq('status','pending');
+  if (!pending?.length) { alert('لا توجد طلبات معلقة'); return; }
+  for (const p of pending) await sb.from('profiles').delete().eq('id', p.id);
+  alert(`تم رفض ${pending.length} طلبات ✓`);
+  loadPending(); loadDashboard();
+}
+
+async function exportMembers() {
+  const { data: members } = await sb.from('profiles').select('*').eq('status','active');
+  const csv = 'الاسم,الإيميل,الرتبة,المستوى,XP\n' + (members||[]).map(m => `${m.full_name},${m.email},${m.rank},${m.level},${m.xp}`).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'TAM-members.csv';
+  a.click();
+}
+
+// ================================================================
+//  HELPERS
+// ================================================================
+const el = id => document.getElementById(id);
+const v = id => (document.getElementById(id)||{}).value || '';
+const show = id => { const e=document.getElementById(id); if(e) e.style.display='flex'; };
+const hide = id => { const e=document.getElementById(id); if(e) e.style.display='none'; };
+const elShow = id => { const e=document.getElementById(id); if(e) e.style.display=''; };
+const setErr = (id, msg) => { const e=document.getElementById(id); if(e) e.textContent=msg; };
+const setOk = (id, msg) => { const e=document.getElementById(id); if(e) e.textContent=msg; };
+const emptyState = msg => `<div class="empty-state"><i class="ti ti-mood-empty"></i><p>${msg}</p></div>`;
+
+function rankColor(rank) {
+  const r = RANKS.find(x => x.n === rank);
+  return r ? r.c : 'var(--blue)';
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff/60000), h = Math.floor(m/60), d = Math.floor(h/24);
+  if (d>0) return `منذ ${d} يوم${d>1?'':''}`; 
+  if (h>0) return `منذ ${h} ساعة`;
+  if (m>0) return `منذ ${m} دقيقة`;
+  return 'الآن';
+}
+
+// ================================================================
+//  PUSH NOTIFICATIONS (PWA)
+// ================================================================
+async function registerPushNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+    console.log('Push notifications enabled ✓');
+  } catch(e) {
+    console.log('Push not supported:', e.message);
+  }
+}
+
+function sendLocalNotif(title, body) {
+  if (Notification.permission === 'granted') {
+    new Notification(title, {
+      body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'tam-plus',
+      renotify: true,
+    });
+  }
+}
+
+// ================================================================
+//  START
+// ================================================================
+window.addEventListener('load', () => {
+  init();
+  registerPushNotifications();
+});
+</script>
+
+<!-- ================================================================
+     📋 إرشادات إعداد Supabase
+     ================================================================
+     بعد ما تعمل حساب على supabase.com وتعمل project، روح SQL Editor وشغل الكود ده:
+
+     -- جدول الملفات الشخصية
+     CREATE TABLE profiles (
+       id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+       full_name TEXT,
+       email TEXT,
+       rank TEXT DEFAULT 'Member',
+       level INTEGER DEFAULT 1,
+       xp INTEGER DEFAULT 0,
+       max_xp INTEGER DEFAULT 50,
+       status TEXT DEFAULT 'pending',
+       band TEXT DEFAULT '',
+       color TEXT DEFAULT '#29ABE2',
+       role TEXT DEFAULT 'member',
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
+     -- جدول المهام
+     CREATE TABLE tasks (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       title TEXT NOT NULL,
+       assignee_id UUID REFERENCES profiles(id),
+       assignee_name TEXT,
+       xp INTEGER DEFAULT 20,
+       status TEXT DEFAULT 'pending',
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
+     -- جدول الأخبار
+     CREATE TABLE news (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       title TEXT NOT NULL,
+       content TEXT,
+       tag TEXT,
+       tag_color TEXT DEFAULT 'blue',
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
+     -- جدول الرسائل
+     CREATE TABLE messages (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       chat_key TEXT NOT NULL,
+       sender_id UUID REFERENCES profiles(id),
+       receiver_id UUID REFERENCES profiles(id),
+       content TEXT NOT NULL,
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+     CREATE INDEX ON messages(chat_key);
+
+     -- جدول القوانين
+     CREATE TABLE rules (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       content TEXT NOT NULL,
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
+     -- جدول التهديدات (محل الباندات)
+     CREATE TABLE bands (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       name TEXT NOT NULL,
+       target_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+       target_name TEXT DEFAULT '',
+       message TEXT DEFAULT '',
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
+     -- جدول الإعدادات
+     CREATE TABLE settings (
+       key TEXT PRIMARY KEY,
+       value TEXT
+     );
+     INSERT INTO settings VALUES ('room_code', 'TAM-AX-1234');
+
+     -- جدول أعضاء الغرفة
+     CREATE TABLE room_members (
+       user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+       joined_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
+     -- تفعيل RLS
+     ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE news ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE rules ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE bands ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE room_members ENABLE ROW LEVEL SECURITY;
+
+     -- السياسات
+     CREATE POLICY "everyone can read" ON profiles FOR SELECT USING (true);
+     CREATE POLICY "user can update own" ON profiles FOR UPDATE USING (auth.uid() = id);
+     CREATE POLICY "user can insert own" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+     CREATE POLICY "leader can update any" ON profiles FOR UPDATE USING (true);
+     CREATE POLICY "everyone reads tasks" ON tasks FOR SELECT USING (true);
+     CREATE POLICY "members can update own tasks" ON tasks FOR UPDATE USING (auth.uid() = assignee_id);
+     CREATE POLICY "everyone reads news" ON news FOR SELECT USING (true);
+     -- الرسائل: كل من له علاقة يقدر يقرأ (يشمل شات الغرفة حيث sender=receiver)
+     CREATE POLICY "read own messages" ON messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+     CREATE POLICY "send messages" ON messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+     CREATE POLICY "everyone reads rules" ON rules FOR SELECT USING (true);
+     CREATE POLICY "everyone reads bands" ON bands FOR SELECT USING (true);
+     CREATE POLICY "read settings" ON settings FOR SELECT USING (true);
+     CREATE POLICY "update settings" ON settings FOR UPDATE USING (true);
+     CREATE POLICY "insert settings" ON settings FOR INSERT WITH CHECK (true);
+     CREATE POLICY "read room" ON room_members FOR SELECT USING (true);
+     CREATE POLICY "join room" ON room_members FOR INSERT WITH CHECK (auth.uid() = user_id);
+     CREATE POLICY "leave room" ON room_members FOR DELETE USING (auth.uid() = user_id OR true);
+
+     -- تفعيل Realtime على جدول الرسائل
+     -- Authentication → Policies → Enable Email
+     -- Supabase Dashboard → Database → Replication → messages table
+
+     ================================================================ -->
+</body>
+</html>
