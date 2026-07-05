@@ -1011,6 +1011,10 @@ async function checkPendingNotif() {
 }
 
 function navigate(page) {
+  // حماية إضافية: صفحات القائد بس، حتى لو حصل استدعاء navigate() لها بالغلط من مكان تاني
+  const LEADER_ONLY_PAGES = ['members','pending','tasks','grouptasks','settings'];
+  if (!isLeader && LEADER_ONLY_PAGES.includes(page)) page = 'dashboard';
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const pg = document.getElementById('page-' + page);
@@ -1166,7 +1170,7 @@ async function loadDashboard() {
   // Top members (بدون القائد)
   const top = [...members].sort((a,b) => b.xp - a.xp).slice(0,5);
   el('dash-top').innerHTML = top.length ? top.map(m => `
-    <div class="t-row" style="grid-template-columns:2fr 1fr 1fr;cursor:pointer" onclick="navigate('members')">
+    <div class="t-row" style="grid-template-columns:2fr 1fr 1fr;cursor:pointer" onclick="navigate(isLeader?'members':'ranks')">
       <div class="mn-cell"><div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'}">${(m.full_name||'?')[0]}</div><span>${m.full_name||m.email}</span></div>
       <span class="r-badge" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)}">${m.rank||'Member'}</span>
       <span style="color:var(--xp);font-weight:700;font-size:12px">${m.xp||0} XP</span>
@@ -1996,8 +2000,12 @@ function openEmojiPicker() {
 }
 
 async function chooseEmojiAvatar(emoji) {
-  await sb.from('profiles').update({ avatar_type:'emoji', avatar_value: emoji, avatar_status:'approved' }).eq('id', currentUser.id);
+  const { error } = await sb.from('profiles').update({ avatar_type:'emoji', avatar_value: emoji, avatar_status:'approved' }).eq('id', currentUser.id);
   closeModal();
+  if (error) {
+    alert('❌ الصورة ما اتحفظتش: ' + error.message + '\n(تأكد إن أعمدة avatar_type/avatar_value/avatar_status موجودة في جدول profiles على Supabase)');
+    return;
+  }
   await loadProfile();
   renderTopbar();
   alert('✅ تم تحديث صورتك الشخصية');
@@ -2022,8 +2030,13 @@ async function onAvatarFileSelected() {
     return;
   }
   const { data } = sb.storage.from('avatars').getPublicUrl(path);
-  await sb.from('profiles').update({ avatar_type:'photo', avatar_value: data.publicUrl, avatar_status:'pending' }).eq('id', currentUser.id);
+  const { error: profErr } = await sb.from('profiles').update({ avatar_type:'photo', avatar_value: data.publicUrl, avatar_status:'pending' }).eq('id', currentUser.id);
   await loadProfile();
+  if (profErr) {
+    if (statusEl) statusEl.innerHTML = '';
+    alert('❌ الصورة اترفعت بس ما اتحفظتش في بروفايلك: ' + profErr.message + '\n(تأكد إن أعمدة avatar_type/avatar_value/avatar_status موجودة في جدول profiles على Supabase)');
+    return;
+  }
   alert('✅ تم رفع الصورة، وهتظهر للكل بعد موافقة القائد عليها');
 }
 
