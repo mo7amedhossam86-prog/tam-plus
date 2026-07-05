@@ -23,6 +23,13 @@
      2- Settings → API → انسخ Project URL و anon public key
      3- الصق هنا
 
+     ⚙️ إعدادات مهمة لازم تتظبط من Supabase Dashboard (مش من الكود):
+     1- Authentication → Providers → Email → "Email OTP Expiration" خليها 600 (يعني 10 دقايق)
+     2- Authentication → Email Templates → "Reset Password" غيّر القالب يستخدم {{ .Token }} بدل {{ .ConfirmationURL }} عشان يوصل كود 6 أرقام مش لينك
+        وممكن تضيف شعار الموقع جوه الـ HTML بتاع القالب ده بـ <img src="رابط اللوجو">
+     3- Authentication → Settings → SMTP Settings → فعّل Custom SMTP (Resend/SendGrid/etc) وحط "Sender Name" = اسم موقعك (TAM+ مثلاً)
+        عشان تبعت باسم الموقع بدل ما تيجي من no-reply@supabase.io
+
      🔑 عشان "نسيت كلمة المرور" يشتغل ويوصل الإيميل فعلاً:
      - روح Authentication → URL Configuration
      - في "Site URL" حط رابط موقعك المنشور (مثلاً https://yourapp.com)
@@ -208,7 +215,7 @@ select.inp{cursor:pointer}
 .chat-prev{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 .chat-window{display:flex;flex-direction:column}
 .chat-top{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--surface)}
-.chat-msgs{flex:1;padding:13px;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
+.chat-msgs{flex:1;padding:13px;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;display:flex;flex-direction:column;gap:7px}
 .msg{max-width:70%;padding:8px 12px;border-radius:12px;font-size:12px;line-height:1.5}
 .msg.sent{background:linear-gradient(135deg,var(--blue),#1566A8);color:#fff;align-self:flex-end;border-radius:12px 12px 3px 12px}
 .msg.recv{background:var(--surface);border:1px solid var(--border);align-self:flex-start;border-radius:12px 12px 12px 3px}
@@ -380,14 +387,29 @@ select.inp{cursor:pointer}
 
     <!-- FORGOT PASSWORD -->
     <div class="auth-form" id="form-forgot">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.8;text-align:center">
-        🔑 اكتب بريدك الإلكتروني وهنبعتلك رابط لإعادة تعيين كلمة المرور في الإنبوكس
+      <div id="forgot-step-email">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.8;text-align:center">
+          🔑 اكتب بريدك الإلكتروني وهنبعتلك كود من 6 أرقام في الإنبوكس
+        </div>
+        <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" id="forgot-email" type="email" placeholder="example@email.com" onkeypress="if(event.key==='Enter')sendResetEmail()"></div>
+        <div class="auth-err" id="forgot-err"></div>
+        <div class="auth-ok" id="forgot-ok"></div>
+        <button class="btn-primary" id="forgot-btn" onclick="sendResetEmail()">إرسال الكود 📩</button>
+        <div style="text-align:center;margin-top:12px"><a href="javascript:void(0)" onclick="switchTab('login')" style="font-size:11px;color:var(--muted);text-decoration:none">← العودة لتسجيل الدخول</a></div>
       </div>
-      <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" id="forgot-email" type="email" placeholder="example@email.com" onkeypress="if(event.key==='Enter')sendResetEmail()"></div>
-      <div class="auth-err" id="forgot-err"></div>
-      <div class="auth-ok" id="forgot-ok"></div>
-      <button class="btn-primary" id="forgot-btn" onclick="sendResetEmail()">إرسال رابط الاستعادة 📩</button>
-      <div style="text-align:center;margin-top:12px"><a href="javascript:void(0)" onclick="switchTab('login')" style="font-size:11px;color:var(--muted);text-decoration:none">← العودة لتسجيل الدخول</a></div>
+      <div id="forgot-step-code" style="display:none">
+        <div style="text-align:right;margin-bottom:6px"><a href="javascript:void(0)" onclick="showForgotForm()" style="font-size:11px;color:var(--muted);text-decoration:none">→ رجوع</a></div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.8;text-align:center">
+          📩 اكتب الكود المكوّن من 6 أرقام اللي وصلك على <b id="forgot-code-email" style="color:var(--gold)"></b>
+        </div>
+        <div style="text-align:center;font-size:11px;color:var(--red);margin-bottom:14px" id="forgot-timer">⏱ الكود صالح لمدة 10:00 دقايق</div>
+        <div class="form-group"><label class="form-label">الكود</label><input class="inp" id="forgot-code" maxlength="6" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="------" style="letter-spacing:8px;text-align:center;font-size:18px" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)"></div>
+        <div class="form-group"><label class="form-label">كلمة المرور الجديدة (8 أحرف على الأقل)</label><input class="inp" id="forgot-newpass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')verifyResetCode()"></div>
+        <div class="auth-err" id="forgot-code-err"></div>
+        <div class="auth-ok" id="forgot-code-ok"></div>
+        <button class="btn-primary" id="forgot-code-btn" onclick="verifyResetCode()">تأكيد وتغيير كلمة المرور</button>
+        <div style="text-align:center;margin-top:12px"><a href="javascript:void(0)" id="forgot-resend-link" onclick="sendResetEmail(true)" style="font-size:11px;color:var(--blue);text-decoration:none">إعادة إرسال الكود</a></div>
+      </div>
     </div>
   </div>
  </div>
@@ -590,8 +612,12 @@ select.inp{cursor:pointer}
         </div>
         <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:18px">
           <div class="sec-title" style="margin-bottom:12px">تغيير كلمة المرور</div>
-          <div class="form-group"><label class="form-label">كلمة المرور الجديدة</label><input class="inp" id="new-pass" type="password" placeholder="••••••••"></div>
-          <button class="btn-primary" style="width:auto;padding:9px 20px;font-size:12px" onclick="changePass()">تغيير</button>
+          <div class="form-group"><label class="form-label">كلمة المرور الحالية</label><input class="inp" id="cur-pass" type="password" placeholder="••••••••"></div>
+          <div class="form-group"><label class="form-label">كلمة المرور الجديدة (8 أحرف على الأقل)</label><input class="inp" id="new-pass" type="password" placeholder="••••••••"></div>
+          <div class="auth-err" id="chpass-err"></div>
+          <div class="auth-ok" id="chpass-ok"></div>
+          <button class="btn-primary" style="width:auto;padding:9px 20px;font-size:12px" id="chpass-btn" onclick="changePass()">تغيير</button>
+          <div style="margin-top:10px"><a href="javascript:void(0)" onclick="forgotCurrentPass()" style="font-size:11px;color:var(--blue);text-decoration:none">ناسي كلمة المرور الحالية؟ ابعتلي كود على الإيميل</a></div>
           <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
             <button class="btn-primary" style="background:linear-gradient(135deg,var(--red),#800000)" onclick="doLogout()">تسجيل الخروج</button>
           </div>
@@ -871,27 +897,105 @@ function switchTab(tab) {
   document.querySelectorAll('.auth-form').forEach((f,i) => f.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
 }
 
+let resetEmailPending = ''; // الإيميل اللي بعتنالوا كود استعادة الباسورد
+let forgotTimerInterval = null;
+let forgotResendCooldown = null;
+
+function stopForgotTimers() {
+  if (forgotTimerInterval) { clearInterval(forgotTimerInterval); forgotTimerInterval = null; }
+  if (forgotResendCooldown) { clearInterval(forgotResendCooldown); forgotResendCooldown = null; }
+}
+
+function startForgotCodeTimer() {
+  stopForgotTimers();
+  let secondsLeft = 10 * 60; // 10 دقايق
+  const timerEl = document.getElementById('forgot-timer');
+  const render = () => {
+    const m = Math.floor(secondsLeft / 60), s = secondsLeft % 60;
+    if (secondsLeft <= 0) {
+      timerEl.textContent = '⏱ انتهت صلاحية الكود — دوس "إعادة إرسال الكود"';
+      clearInterval(forgotTimerInterval); forgotTimerInterval = null;
+      return;
+    }
+    timerEl.textContent = `⏱ الكود صالح لمدة ${m}:${s.toString().padStart(2,'0')} دقايق`;
+    secondsLeft--;
+  };
+  render();
+  forgotTimerInterval = setInterval(render, 1000);
+
+  // كولداون إعادة الإرسال (60 ثانية) عشان منمنعوش الإسبام
+  let cooldown = 60;
+  const link = document.getElementById('forgot-resend-link');
+  link.style.pointerEvents = 'none'; link.style.opacity = '0.5';
+  const renderCd = () => {
+    if (cooldown <= 0) {
+      link.textContent = 'إعادة إرسال الكود';
+      link.style.pointerEvents = ''; link.style.opacity = '';
+      clearInterval(forgotResendCooldown); forgotResendCooldown = null;
+      return;
+    }
+    link.textContent = `إعادة إرسال الكود (${cooldown})`;
+    cooldown--;
+  };
+  renderCd();
+  forgotResendCooldown = setInterval(renderCd, 1000);
+}
+
 function showForgotForm() {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
   const emailField = document.getElementById('forgot-email');
   if (emailField) emailField.value = v('login-email') || '';
   setErr('forgot-err',''); setOk('forgot-ok','');
+  stopForgotTimers();
+  document.getElementById('forgot-step-email').style.display = '';
+  document.getElementById('forgot-step-code').style.display = 'none';
   document.getElementById('form-forgot').classList.add('active');
 }
 
-async function sendResetEmail() {
-  const email = v('forgot-email');
+// كانReSend = true لو المستخدم داس على "إعادة إرسال الكود" وهو في خطوة إدخال الكود بالفعل
+async function sendResetEmail(reSend) {
+  const email = reSend ? resetEmailPending : v('forgot-email');
   if (!email) { setErr('forgot-err','يرجى إدخال بريدك الإلكتروني'); return; }
-  setErr('forgot-err',''); setOk('forgot-ok','');
-  const btn = document.getElementById('forgot-btn');
+  const errEl = reSend ? 'forgot-code-err' : 'forgot-err';
+  const okEl = reSend ? 'forgot-code-ok' : 'forgot-ok';
+  setErr(errEl,''); setOk(okEl,'');
+  const btn = document.getElementById(reSend ? 'forgot-code-btn' : 'forgot-btn');
+  const oldTxt = btn.textContent;
   btn.disabled = true; btn.textContent = 'جاري الإرسال...';
-  const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + window.location.pathname
-  });
-  btn.disabled = false; btn.textContent = 'إرسال رابط الاستعادة 📩';
-  if (error) { setErr('forgot-err', getArabicError(error.message)); return; }
-  setOk('forgot-ok', '✓ تم إرسال رابط استعادة كلمة المرور — افتح الإيميل بتاعك (وراجع الـ Spam لو مالقتوش)');
+  // بيبعت إيميل فيه كود 6 أرقام (Email OTP) بدل لينك — لازم قالب الإيميل في Supabase يستخدم {{ .Token }}
+  const { error } = await sb.auth.resetPasswordForEmail(email);
+  btn.disabled = false; btn.textContent = oldTxt;
+  if (error) { setErr(errEl, getArabicError(error.message)); return; }
+  resetEmailPending = email;
+  document.getElementById('forgot-code-email').textContent = email;
+  document.getElementById('forgot-step-email').style.display = 'none';
+  document.getElementById('forgot-step-code').style.display = '';
+  document.getElementById('forgot-code').value = '';
+  setOk('forgot-code-ok', reSend ? '✓ تم إرسال كود جديد' : '');
+  startForgotCodeTimer();
+}
+
+async function verifyResetCode() {
+  const code = v('forgot-code').trim();
+  const newPass = v('forgot-newpass');
+  setErr('forgot-code-err',''); setOk('forgot-code-ok','');
+  if (!/^\d{6}$/.test(code)) { setErr('forgot-code-err','اكتب الكود المكوّن من 6 أرقام'); return; }
+  if (!newPass || newPass.length < 8) { setErr('forgot-code-err','كلمة المرور الجديدة لازم تكون 8 أحرف على الأقل'); return; }
+  const btn = document.getElementById('forgot-code-btn');
+  btn.disabled = true; btn.textContent = 'جاري التحقق...';
+  const { error: otpErr } = await sb.auth.verifyOtp({ email: resetEmailPending, token: code, type: 'recovery' });
+  if (otpErr) {
+    btn.disabled = false; btn.textContent = 'تأكيد وتغيير كلمة المرور';
+    setErr('forgot-code-err', 'الكود غلط أو منتهي — دوس "إعادة إرسال الكود"');
+    return;
+  }
+  const { error: updateErr } = await sb.auth.updateUser({ password: newPass });
+  btn.disabled = false; btn.textContent = 'تأكيد وتغيير كلمة المرور';
+  if (updateErr) { setErr('forgot-code-err', getArabicError(updateErr.message)); return; }
+  setOk('forgot-code-ok', '✓ تم تغيير كلمة المرور بنجاح! جاري تسجيل الدخول...');
+  stopForgotTimers();
+  setTimeout(() => location.reload(), 1500);
 }
 
 async function doLogin() {
@@ -980,11 +1084,35 @@ async function doLogout() {
 }
 
 async function changePass() {
+  const curPass = v('cur-pass');
   const p = v('new-pass');
-  if (!p || p.length < 8) { alert('كلمة المرور 8 أحرف على الأقل'); return; }
+  setErr('chpass-err',''); setOk('chpass-ok','');
+  if (!curPass) { setErr('chpass-err','لازم تكتب كلمة المرور الحالية الأول'); return; }
+  if (!p || p.length < 8) { setErr('chpass-err','كلمة المرور الجديدة لازم تكون 8 أحرف على الأقل'); return; }
+  const btn = document.getElementById('chpass-btn');
+  btn.disabled = true; btn.textContent = 'جاري التحقق...';
+  // نتأكد الأول إن كلمة المرور الحالية صح عن طريق محاولة تسجيل دخول بيها
+  const { error: verifyErr } = await sb.auth.signInWithPassword({ email: currentUser.email, password: curPass });
+  if (verifyErr) {
+    btn.disabled = false; btn.textContent = 'تغيير';
+    setErr('chpass-err', 'كلمة المرور الحالية غلط');
+    return;
+  }
   const { error } = await sb.auth.updateUser({ password: p });
-  if (error) alert('خطأ: ' + error.message);
-  else { alert('تم تغيير كلمة المرور ✓'); document.getElementById('new-pass').value = ''; }
+  btn.disabled = false; btn.textContent = 'تغيير';
+  if (error) { setErr('chpass-err', 'خطأ: ' + error.message); return; }
+  setOk('chpass-ok', 'تم تغيير كلمة المرور ✓');
+  document.getElementById('cur-pass').value = '';
+  document.getElementById('new-pass').value = '';
+}
+
+// المستخدم ناسي كلمة المرور الحالية وهو داخل إعداداته — نبعتله كود على إيميله المسجل
+async function forgotCurrentPass() {
+  if (!currentUser?.email) return;
+  if (!confirm('هيتبعت كود من 6 أرقام على إيميلك (' + currentUser.email + ') صالح لمدة 10 دقايق، هتحتاج تسجل خروج وتدخل بيه من "نسيت كلمة المرور". تكمل؟')) return;
+  const { error } = await sb.auth.resetPasswordForEmail(currentUser.email);
+  if (error) { alert('خطأ: ' + getArabicError(error.message)); return; }
+  alert('✓ اتبعت كود على إيميلك — سجل خروج وادخل على "نسيت كلمة المرور" لإدخال الكود');
 }
 
 // بتتفعّل لما العضو يدوس على لينك استعادة كلمة المرور اللي وصله بالإيميل
@@ -2536,7 +2664,7 @@ async function loadRoomChat() {
   roomArea.innerHTML += `
     <div id="room-chat-box" style="margin-top:16px;background:var(--card);border:1px solid var(--gold)33;border-radius:13px;padding:14px">
       <div class="sec-title" style="color:var(--gold);margin-bottom:10px">💬 شات الغرفة الخاصة 👑 <span style="font-size:9px;color:var(--green)">🔒 مشفّرة بصلاحيات — أعضاء الغرفة والقائد فقط</span></div>
-      <div id="room-chat-msgs" style="height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px">
+      <div id="room-chat-msgs" style="height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px"
         <div style="text-align:center;color:var(--muted);font-size:11px">جاري تحميل الرسائل...</div>
       </div>
       <div id="room-voice-bar" style="display:none;align-items:center;gap:8px;padding:4px 2px 8px;font-size:11px;color:var(--red)">
