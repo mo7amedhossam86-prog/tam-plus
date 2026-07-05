@@ -22,6 +22,13 @@
      1- روح supabase.com → اعمل project جديد
      2- Settings → API → انسخ Project URL و anon public key
      3- الصق هنا
+
+     🔑 عشان "نسيت كلمة المرور" يشتغل ويوصل الإيميل فعلاً:
+     - روح Authentication → URL Configuration
+     - في "Site URL" حط رابط موقعك المنشور (مثلاً https://yourapp.com)
+     - في "Redirect URLs" ضيف نفس الرابط (أو رابط الصفحة اللي هيفتح منها التطبيق)
+     - الإيميلات بتتبعت افتراضياً من سيرفر Supabase (محدود العدد يومياً)،
+       لو حابب ترفع الحد أو تستخدم دومين خاص بيك: Authentication → Emails → SMTP Settings
      ============================================================ -->
 <script>
   const SUPABASE_URL = 'https://hdfxiqsgzttiulsjcrgb.supabase.co';
@@ -149,7 +156,7 @@ select.inp{cursor:pointer}
 .bgold{background:rgba(255,179,0,.15);color:var(--gold);border:1px solid rgba(255,179,0,.3)}.bgold:hover{background:rgba(255,179,0,.28)}
 
 /* TASKS */
-.tasks-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tasks-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .t-col-head{border-radius:11px 11px 0 0;padding:10px 14px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-bottom:none}
 .t-col-body{background:rgba(0,0,0,.12);border:1px solid var(--border);border-top:none;border-radius:0 0 11px 11px;padding:9px;min-height:170px;display:flex;flex-direction:column;gap:6px}
 .task-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
@@ -166,6 +173,7 @@ select.inp{cursor:pointer}
 .my-task-status{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
 .st-pending{background:rgba(107,116,153,.15);color:var(--muted)}
 .st-active{background:rgba(41,171,226,.15);color:var(--blue)}
+.st-review{background:rgba(255,179,0,.15);color:var(--gold)}
 .st-done{background:rgba(57,201,107,.15);color:var(--green)}
 
 /* RANKS */
@@ -357,6 +365,7 @@ select.inp{cursor:pointer}
       <div class="form-group"><label class="form-label">كلمة المرور</label><input class="inp" id="login-pass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')doLogin()"></div>
       <div class="auth-err" id="login-err"></div>
       <button class="btn-primary" id="login-btn" onclick="doLogin()">دخول إلى TAM+ 🔥</button>
+      <div style="text-align:center;margin-top:12px"><a href="javascript:void(0)" onclick="showForgotForm()" style="font-size:11px;color:var(--blue);text-decoration:none">نسيت كلمة المرور؟</a></div>
     </div>
 
     <!-- REGISTER -->
@@ -367,6 +376,18 @@ select.inp{cursor:pointer}
       <div class="auth-err" id="reg-err"></div>
       <div class="auth-ok" id="reg-ok"></div>
       <button class="btn-primary" id="reg-btn" onclick="doRegister()">إنشاء الحساب</button>
+    </div>
+
+    <!-- FORGOT PASSWORD -->
+    <div class="auth-form" id="form-forgot">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.8;text-align:center">
+        🔑 اكتب بريدك الإلكتروني وهنبعتلك رابط لإعادة تعيين كلمة المرور في الإنبوكس
+      </div>
+      <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" id="forgot-email" type="email" placeholder="example@email.com" onkeypress="if(event.key==='Enter')sendResetEmail()"></div>
+      <div class="auth-err" id="forgot-err"></div>
+      <div class="auth-ok" id="forgot-ok"></div>
+      <button class="btn-primary" id="forgot-btn" onclick="sendResetEmail()">إرسال رابط الاستعادة 📩</button>
+      <div style="text-align:center;margin-top:12px"><a href="javascript:void(0)" onclick="switchTab('login')" style="font-size:11px;color:var(--muted);text-decoration:none">← العودة لتسجيل الدخول</a></div>
     </div>
   </div>
  </div>
@@ -446,6 +467,7 @@ select.inp{cursor:pointer}
         <div class="tasks-grid">
           <div><div class="t-col-head" style="border-top:3px solid var(--muted)"><span>⏳ معلقة</span><span class="col-cnt" id="cnt-p"></span></div><div class="t-col-body" id="col-p"></div></div>
           <div><div class="t-col-head" style="border-top:3px solid var(--blue)"><span>🔄 جارية</span><span class="col-cnt" id="cnt-a"></span></div><div class="t-col-body" id="col-a"></div></div>
+          <div><div class="t-col-head" style="border-top:3px solid var(--gold)"><span>🔍 قيد المراجعة</span><span class="col-cnt" id="cnt-r"></span></div><div class="t-col-body" id="col-r"></div></div>
           <div><div class="t-col-head" style="border-top:3px solid var(--green)"><span>✅ مكتملة</span><span class="col-cnt" id="cnt-d"></span></div><div class="t-col-body" id="col-d"></div></div>
         </div>
       </div>
@@ -649,6 +671,7 @@ try {
 let currentUser = null;
 let userProfile = null;
 let isLeader = false;
+let isPasswordRecovery = false; // true وإحنا في وضع تعيين كلمة مرور جديدة عن طريق لينك الإيميل
 let currentChatUserId = null;
 let canAccessEliteRoom = false; // القائد دايماً مشرف على الغرفة تلقائياً بدون ما يتضاف كعضو في room_members
 let chatSubscription = null;
@@ -747,23 +770,14 @@ async function setupDatabase() {
 // ================================================================
 async function init() {
   if (!sb) return;
-  
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session?.user) {
-      currentUser = session.user;
-      await loadUserProfile();
-      showApp();
-      registerPushNotifications();
-    } else {
-      showAuth();
-    }
-  } catch(e) {
-    showAuth();
-  }
 
   sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      showResetPasswordScreen();
+      return;
+    }
     if (event === 'SIGNED_IN' && session) {
+      if (isPasswordRecovery) return; // لسه بيحط كلمة مرور جديدة — منسيبوش يدخل التطبيق تلقائي
       currentUser = session.user;
       const ok = await loadUserProfile();
       if (ok !== false) { showApp(); registerPushNotifications(); }
@@ -774,6 +788,20 @@ async function init() {
       showAuth();
     }
   });
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user && !isPasswordRecovery) {
+      currentUser = session.user;
+      await loadUserProfile();
+      showApp();
+      registerPushNotifications();
+    } else if (!isPasswordRecovery) {
+      showAuth();
+    }
+  } catch(e) {
+    if (!isPasswordRecovery) showAuth();
+  }
 }
 
 async function loadUserProfile() {
@@ -839,8 +867,31 @@ async function showApp() {
 }
 
 function switchTab(tab) {
-  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+  document.querySelectorAll('.auth-tab').forEach((t,i) => { t.style.display=''; t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')); });
   document.querySelectorAll('.auth-form').forEach((f,i) => f.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+}
+
+function showForgotForm() {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+  const emailField = document.getElementById('forgot-email');
+  if (emailField) emailField.value = v('login-email') || '';
+  setErr('forgot-err',''); setOk('forgot-ok','');
+  document.getElementById('form-forgot').classList.add('active');
+}
+
+async function sendResetEmail() {
+  const email = v('forgot-email');
+  if (!email) { setErr('forgot-err','يرجى إدخال بريدك الإلكتروني'); return; }
+  setErr('forgot-err',''); setOk('forgot-ok','');
+  const btn = document.getElementById('forgot-btn');
+  btn.disabled = true; btn.textContent = 'جاري الإرسال...';
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+  btn.disabled = false; btn.textContent = 'إرسال رابط الاستعادة 📩';
+  if (error) { setErr('forgot-err', getArabicError(error.message)); return; }
+  setOk('forgot-ok', '✓ تم إرسال رابط استعادة كلمة المرور — افتح الإيميل بتاعك (وراجع الـ Spam لو مالقتوش)');
 }
 
 async function doLogin() {
@@ -936,9 +987,49 @@ async function changePass() {
   else { alert('تم تغيير كلمة المرور ✓'); document.getElementById('new-pass').value = ''; }
 }
 
+// بتتفعّل لما العضو يدوس على لينك استعادة كلمة المرور اللي وصله بالإيميل
+function showResetPasswordScreen() {
+  isPasswordRecovery = true;
+  hide('loading'); hide('app'); show('auth-screen');
+  document.querySelectorAll('.auth-tab').forEach(t => t.style.display = 'none');
+  document.querySelector('.auth-box').innerHTML = `
+    <div style="text-align:center;padding:4px 0 16px">
+      <div style="font-size:36px;margin-bottom:10px">🔑</div>
+      <div style="font-size:16px;font-weight:700">تعيين كلمة مرور جديدة</div>
+    </div>
+    <div class="form-group"><label class="form-label">كلمة المرور الجديدة (8 أحرف على الأقل)</label><input class="inp" id="recovery-pass" type="password" placeholder="••••••••" onkeypress="if(event.key==='Enter')submitNewPassword()"></div>
+    <div class="auth-err" id="recovery-err"></div>
+    <div class="auth-ok" id="recovery-ok"></div>
+    <button class="btn-primary" id="recovery-btn" onclick="submitNewPassword()">حفظ كلمة المرور الجديدة</button>
+  `;
+}
+
+async function submitNewPassword() {
+  const p = v('recovery-pass');
+  if (!p || p.length < 8) { setErr('recovery-err','كلمة المرور 8 أحرف على الأقل'); return; }
+  setErr('recovery-err',''); setOk('recovery-ok','');
+  const btn = document.getElementById('recovery-btn');
+  btn.disabled = true; btn.textContent = 'جاري الحفظ...';
+  const { error } = await sb.auth.updateUser({ password: p });
+  if (error) { btn.disabled = false; btn.textContent = 'حفظ كلمة المرور الجديدة'; setErr('recovery-err', getArabicError(error.message)); return; }
+  setOk('recovery-ok', '✓ تم تغيير كلمة المرور بنجاح! جاري تسجيل الدخول...');
+  isPasswordRecovery = false;
+  setTimeout(async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) {
+      currentUser = session.user;
+      const ok = await loadUserProfile();
+      if (ok !== false) { showApp(); registerPushNotifications(); }
+    } else {
+      location.reload();
+    }
+  }, 1200);
+}
+
 function getArabicError(msg) {
   if (msg.includes('Invalid login')) return 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
   if (msg.includes('already registered')) return 'هذا البريد الإلكتروني مسجل مسبقاً';
+  if (msg.includes('security purposes') || msg.includes('rate limit')) return 'يرجى الانتظار قليلاً قبل إعادة المحاولة';
   if (msg.includes('password')) return 'كلمة المرور ضعيفة جداً';
   if (msg.includes('email')) return 'بريد إلكتروني غير صالح';
   return msg;
@@ -1061,8 +1152,11 @@ function startRealtimeSubscriptions() {
         checkPendingNotif(); loadPending(); loadMembers(); loadDashboard();
       }).subscribe();
     sb.channel("tasks-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, (payload) => {
         loadTasks(); loadDashboard(); loadGroupTasks();
+        if (payload.eventType === 'UPDATE' && payload.new?.status === 'review' && payload.old?.status !== 'review') {
+          addMemberNotif(`🔍 ${payload.new.assignee_name||'عضو'} أنهى مهمة "${payload.new.title}" وبانتظار تأكيدك`);
+        }
       }).subscribe();
     sb.channel("submissions-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "task_submissions" }, () => {
@@ -1087,6 +1181,14 @@ function startRealtimeSubscriptions() {
         }
         if (payload.eventType === 'INSERT' && payload.new?.type === 'group') {
           addMemberNotif(`👥 مهمة جماعية جديدة: ${payload.new.title}`);
+        }
+        if (payload.eventType === 'UPDATE' && payload.new?.assignee_id === currentUser.id) {
+          if (payload.new.status === 'done' && payload.old?.status === 'review') {
+            addMemberNotif(`✅ القائد أكّد مهمة "${payload.new.title}" — حصلت على +${payload.new.xp} XP`);
+          }
+          if (payload.new.status === 'active' && payload.old?.status === 'review') {
+            addMemberNotif(`↩ القائد رجّعلك مهمة "${payload.new.title}" — كملها كويس`);
+          }
         }
       }).subscribe();
     sb.channel("my-submissions-changes")
@@ -1202,7 +1304,7 @@ async function loadDashboard() {
     <div class="t-row" style="grid-template-columns:2fr 1fr 1fr;cursor:pointer" onclick="navigate(isLeader?'tasks':'mytasks')">
       <span style="font-size:11px;font-weight:600">${t.title}</span>
       <span class="task-xp">+${t.xp} XP</span>
-      <span style="font-size:10px;color:${t.status==='done'?'var(--green)':t.status==='active'?'var(--blue)':'var(--muted)'}">${t.status==='done'?'✅':t.status==='active'?'🔄':'⏳'}</span>
+      <span style="font-size:10px;color:${t.status==='done'?'var(--green)':t.status==='active'?'var(--blue)':t.status==='review'?'var(--gold)':'var(--muted)'}">${t.status==='done'?'✅':t.status==='active'?'🔄':t.status==='review'?'🔍':'⏳'}</span>
     </div>`).join('') : emptyState('لا توجد مهام');
 }
 
@@ -1299,9 +1401,11 @@ async function loadTasks() {
   const { data: tasks } = await query;
   const p = (tasks||[]).filter(t=>t.status==='pending');
   const a = (tasks||[]).filter(t=>t.status==='active');
+  const r = (tasks||[]).filter(t=>t.status==='review');
   const d = (tasks||[]).filter(t=>t.status==='done');
   if (el('cnt-p')) el('cnt-p').textContent = p.length;
   if (el('cnt-a')) el('cnt-a').textContent = a.length;
+  if (el('cnt-r')) el('cnt-r').textContent = r.length;
   if (el('cnt-d')) el('cnt-d').textContent = d.length;
 
   const isMyTask = t => t.assignee_id === currentUser.id;
@@ -1312,8 +1416,8 @@ async function loadTasks() {
       <div class="task-meta">
         <span class="task-xp">+${t.xp} XP</span>
         <div style="display:flex;gap:3px">
-          ${t.status!=='done'&&isLeader?`<button class="bs bg" onclick="advTask('${t.id}','${t.status}','${t.assignee_id}',${t.xp})">✓ تقدم</button>`:''}
-          ${t.status==='active'&&isMyTask(t)&&!isLeader?`<button class="bs bg" onclick="memberCompleteTask('${t.id}',${t.xp})">✓ أنهيت</button>`:''}
+          ${(t.status==='pending'||t.status==='active')&&isLeader?`<button class="bs bg" onclick="advTask('${t.id}','${t.status}','${t.assignee_id}',${t.xp})">✓ تقدم</button>`:''}
+          ${t.status==='review'&&isLeader?`<button class="bs bg" onclick="approveTaskReview('${t.id}','${t.assignee_id}',${t.xp},'${(t.title||'').replace(/'/g,"\\'")}')">✅ تأكيد</button><button class="bs br" onclick="rejectTaskReview('${t.id}','${t.assignee_id}','${(t.title||'').replace(/'/g,"\\'")}')">↩ رجّعها</button>`:''}
           ${isLeader?`<button class="bs br" onclick="delTask('${t.id}')">×</button>`:''}
         </div>
       </div>
@@ -1321,6 +1425,7 @@ async function loadTasks() {
 
   if (el('col-p')) el('col-p').innerHTML = p.map(mk).join('') + (isLeader?`<button class="add-task-btn" onclick="showAddTask()">+ مهمة جديدة</button>`:'');
   if (el('col-a')) el('col-a').innerHTML = a.map(mk).join('');
+  if (el('col-r')) el('col-r').innerHTML = r.map(mk).join('');
   if (el('col-d')) el('col-d').innerHTML = d.map(mk).join('');
 }
 
@@ -1357,34 +1462,58 @@ async function advTask(id, status, assigneeId, xp) {
   loadTasks(); loadDashboard(); loadMembers();
 }
 
-async function memberCompleteTask(taskId, xp) {
-  if (!confirm('هل أنهيت هذه المهمة؟')) return;
-  const { error } = await sb.from('tasks').update({status:'done'}).eq('id', taskId).eq('assignee_id', currentUser.id);
+async function submitTaskForReview(taskId, title) {
+  if (!confirm('هل أنهيت هذه المهمة؟ هتتبعت للقائد عشان يتأكد ويوافق عليها')) return;
+  const { error } = await sb.from('tasks').update({status:'review'}).eq('id', taskId).eq('assignee_id', currentUser.id);
   if (error) { alert('خطأ: ' + error.message); return; }
-  
-  // Give XP to member
-  const { data: prof } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-  if (prof) {
-    const { newXP, newLevel, newRank, newMaxXP, promoted, rankMsg } = applyXPGain(prof, xp);
-    await sb.from('profiles').update({xp: newXP, level: newLevel, rank: newRank, max_xp: newMaxXP}).eq('id', currentUser.id);
-    if (promoted) {
-      // ابعت تهنئة في الشات الخاص بتاع العضو (نفس اللي بيحصل لما القائد هو اللي بيوافق على المهمة)
-      const { data: leader } = await sb.from('profiles').select('id').eq('email', LEADER_EMAIL).single();
-      if (leader) {
-        // sender_id لازم يكون هو العضو نفسه (auth.uid() الحالي) عشان سياسة الحماية RLS بتسمح بس لصاحب الرسالة إنه يبعتها
-        const chatKey = [leader.id, currentUser.id].sort().join('_');
-        await sb.from('messages').insert({
-          chat_key: chatKey,
-          sender_id: currentUser.id,
-          receiver_id: leader.id,
-          content: '🎉 تهانينا ' + (prof.full_name||'') + '! لقد ترقيت إلى ' + rankMsg + ' في TAM+ 👑'
-        });
-      }
-      alert('🎉 تهانينا! ترقيت إلى ' + rankMsg);
-    }
-    else alert('✅ أحسنت! حصلت على ' + xp + ' XP');
-  }
+  alert('📨 تم إرسال المهمة للقائد للمراجعة — هتاخد الـ XP بعد ما يوافق عليها');
+  // إشعار حقيقي للقائد عشان يراجع
+  const { data: leader } = await sb.from('profiles').select('id').eq('email', LEADER_EMAIL).single();
+  if (leader) sendPushTo(leader.id, '🔍 مهمة بانتظار المراجعة', `${userProfile?.full_name||'عضو'} أنهى: ${title||'مهمة'}`, '/');
   loadMyTasks(); loadTasks();
+}
+
+// القائد بيتأكد إن العضو فعلاً عمل المهمة ويدي الـ XP
+async function approveTaskReview(taskId, assigneeId, xp, title) {
+  const { error } = await sb.from('tasks').update({status:'done'}).eq('id', taskId);
+  if (error) { alert('خطأ: ' + error.message); return; }
+  if (assigneeId && assigneeId !== currentUser.id) {
+    const { data: prof } = await sb.from('profiles').select('*').eq('id', assigneeId).single();
+    if (prof && prof.role !== 'leader') {
+      const { newXP, newLevel, newRank, newMaxXP, promoted, rankMsg } = applyXPGain(prof, xp);
+      await sb.from('profiles').update({xp: newXP, level: newLevel, rank: newRank, max_xp: newMaxXP}).eq('id', assigneeId);
+      const chatKey = [currentUser.id, assigneeId].sort().join('_');
+      await sb.from('messages').insert({
+        chat_key: chatKey,
+        sender_id: currentUser.id,
+        receiver_id: assigneeId,
+        content: promoted
+          ? '🎉 تهانينا ' + (prof.full_name||'') + '! تم تأكيد مهمتك "' + (title||'') + '" وترقيت إلى ' + rankMsg + ' في TAM+ 👑'
+          : '✅ تم تأكيد إنجازك لمهمة "' + (title||'') + '" — حصلت على +' + xp + ' XP'
+      });
+      sendPushTo(assigneeId, '✅ تم تأكيد المهمة', promoted ? `تهانينا! ترقيت إلى ${rankMsg} 👑` : `حصلت على +${xp} XP لمهمة "${title||''}"`, '/');
+      if (promoted) alert('🎉 ترقية! ' + (prof.full_name||'') + ' وصل إلى ' + rankMsg);
+    }
+  }
+  loadTasks(); loadDashboard(); loadMembers();
+}
+
+// القائد بيرفض ويرجّع المهمة للعضو عشان يكمل فيها أو يعيد المحاولة
+async function rejectTaskReview(taskId, assigneeId, title) {
+  if (!confirm('هل أنت متأكد إن المهمة دي لسه مش خالصة؟ هترجعلها "جارية" تاني')) return;
+  const { error } = await sb.from('tasks').update({status:'active'}).eq('id', taskId);
+  if (error) { alert('خطأ: ' + error.message); return; }
+  if (assigneeId) {
+    const chatKey = [currentUser.id, assigneeId].sort().join('_');
+    await sb.from('messages').insert({
+      chat_key: chatKey,
+      sender_id: currentUser.id,
+      receiver_id: assigneeId,
+      content: '↩ القائد رجّعلك مهمة "' + (title||'') + '" — كملها كويس وابعتها تاني'
+    });
+    sendPushTo(assigneeId, '↩ مهمة اترجعت', `راجع مهمة "${title||''}" وكملها كويس`, '/');
+  }
+  loadTasks(); loadDashboard();
 }
 
 async function delTask(id) {
@@ -1481,15 +1610,16 @@ async function closeGroupTask(taskId) {
 
 async function loadMyTasks() {
   const { data: tasks } = await sb.from('tasks').select('*').eq('assignee_id', currentUser.id).order('created_at',{ascending:false});
+  const statusLabel = { pending:'⏳ معلقة', active:'🔄 جارية — اشتغل فيها!', review:'🔍 قيد المراجعة — بانتظار تأكيد القائد', done:'✅ مكتملة — أحسنت!' };
   el('my-tasks-list').innerHTML = tasks?.length ? tasks.map(t => `
     <div class="my-task-card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
         <div>
           <div class="my-task-title">${t.title}</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:8px">المكافأة: <b style="color:var(--xp)">+${t.xp} XP</b></div>
-          <span class="my-task-status st-${t.status}">${t.status==='pending'?'⏳ معلقة':t.status==='active'?'🔄 جارية — اشتغل فيها!':'✅ مكتملة — أحسنت!'}</span>
+          <span class="my-task-status st-${t.status}">${statusLabel[t.status]||t.status}</span>
         </div>
-        ${t.status==='active'?`<button class="bs bg" onclick="memberCompleteTask('${t.id}',${t.xp})" style="flex-shrink:0;padding:8px 14px;font-size:12px">✅ أنهيت!</button>`:''}
+        ${t.status==='active'?`<button class="bs bg" onclick="submitTaskForReview('${t.id}','${(t.title||'').replace(/'/g,"\\'")}')" style="flex-shrink:0;padding:8px 14px;font-size:12px">📨 أنهيت — ابعتها للمراجعة</button>`:''}
       </div>
     </div>`).join('') : '<div class="empty-state"><i class="ti ti-checklist"></i><p>لا توجد مهام مسندة إليك بعد</p></div>';
 }
