@@ -107,6 +107,7 @@ select.inp{cursor:pointer}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 18px;height:55px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .topbar-logo{display:flex;align-items:center;gap:9px;cursor:pointer}
 .mini-flower{width:44px;height:44px;position:relative;flex-shrink:0}
+.mini-flower.spin-refresh{animation:spin .7s cubic-bezier(.45,0,.55,1) both}
 .mp{position:absolute;width:13px;height:17px;border-radius:50% 50% 50% 50%/65% 65% 35% 35%}
 .mp.b{background:#29ABE2;top:1px;left:1px;transform-origin:bottom right;transform:rotate(-42deg)}
 .mp.r{background:#E94B4B;top:1px;right:1px;transform-origin:bottom left;transform:rotate(42deg)}
@@ -425,8 +426,8 @@ select.inp{cursor:pointer}
 <!-- APP -->
 <div id="app">
   <div class="topbar">
-    <div class="topbar-logo" onclick="navigate('dashboard')">
-      <svg class="mini-flower" viewBox="0 0 680 450" xmlns="http://www.w3.org/2000/svg">
+    <div class="topbar-logo" onclick="spinLogoAndRefresh()">
+      <svg class="mini-flower" id="topbar-mini-flower" viewBox="0 0 680 450" xmlns="http://www.w3.org/2000/svg">
         <path class="petal petal-blue" fill="url(#grad-blue)" transform="translate(340,225) rotate(-45)" d="M0,-10 C-25,-51 -80,-86 -80,-170 A80,80 0 0,1 80,-170 C80,-86 25,-51 0,-10 Z"/>
         <path class="petal petal-red" fill="url(#grad-red)" transform="translate(340,225) rotate(45)" d="M0,-10 C-25,-51 -80,-86 -80,-170 A80,80 0 0,1 80,-170 C80,-86 25,-51 0,-10 Z"/>
         <path class="petal petal-yellow" fill="url(#grad-yellow)" transform="translate(340,225) rotate(-135)" d="M0,-10 C-25,-51 -80,-86 -80,-170 A80,80 0 0,1 80,-170 C80,-86 25,-51 0,-10 Z"/>
@@ -461,7 +462,7 @@ select.inp{cursor:pointer}
           <div class="stat-card sc-r"><div class="stat-icon"><i class="ti ti-news"></i></div><div class="stat-num" id="s-news">-</div><div class="stat-label">أخبار منشورة</div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px">
-          <div><div class="sec-title">🔥 أفضل الأعضاء XP</div><div class="data-table"><div id="dash-top"></div></div></div>
+          <div><div class="sec-title">🔥 أفضل الأعضاء</div><div class="data-table"><div id="dash-top"></div></div></div>
           <div><div class="sec-title">📋 آخر المهام</div><div class="data-table"><div id="dash-tasks-list"></div></div></div>
         </div>
       </div>
@@ -757,6 +758,20 @@ const RANKS = [
   {n:'Master X',i:'👑',c:'var(--gold)',m:true},
   {n:'MasterX MAX',i:'🌌',c:'#FF00FF',m:true,max:true},
 ];
+// ================================================================
+//  ترتيب الأعضاء الموحّد: 1) الرتبة  2) المستوى  3) الـ XP
+// ================================================================
+function rankIndex(rankName) {
+  const i = RANKS.findIndex(r => r.n === rankName);
+  return i >= 0 ? i : 0;
+}
+function compareMembers(a, b) {
+  const rDiff = rankIndex(b.rank) - rankIndex(a.rank);
+  if (rDiff !== 0) return rDiff;
+  const lDiff = (b.level || 1) - (a.level || 1);
+  if (lDiff !== 0) return lDiff;
+  return (b.xp || 0) - (a.xp || 0);
+}
 // مستويات التهديد — من الأشد للأخف
 const THREAT_LEVELS = [
   { name: 'تهديد أسود',    color: '#111111', border: '#444444', icon: '⬛', label: 'Lv.1 — الأشد خطورة' },
@@ -1508,6 +1523,13 @@ async function checkPendingNotif() {
   lastSupportCount = supportCount;
 }
 
+// دوسة على اللوجو فوق شمال: بيلف ثم يعمل ريفريش كامل للصفحة
+function spinLogoAndRefresh() {
+  const logo = document.getElementById('topbar-mini-flower');
+  if (logo) logo.classList.add('spin-refresh');
+  setTimeout(() => location.reload(), 550);
+}
+
 function navigate(page) {
   // حماية إضافية: صفحات القائد بس، حتى لو حصل استدعاء navigate() لها بالغلط من مكان تاني
   const LEADER_ONLY_PAGES = ['members','pending','tasks','grouptasks','settings','support','deleted'];
@@ -1694,8 +1716,8 @@ async function loadDashboard() {
   const { count } = await sb.from('news').select('*', {count:'exact',head:true});
   el('s-news').textContent = count || 0;
 
-  // Top members (بدون القائد)
-  const top = [...members].sort((a,b) => b.xp - a.xp).slice(0,5);
+  // Top members (بدون القائد) — الترتيب: 1) الرتبة 2) المستوى 3) الـ XP
+  const top = [...members].sort(compareMembers).slice(0,5);
   el('dash-top').innerHTML = top.length ? top.map(m => `
     <div class="t-row" style="grid-template-columns:2fr 1fr 1fr;cursor:pointer" onclick="navigate(isLeader?'members':'ranks')">
       <div class="mn-cell"><div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden">${avatarHTML(m)}</div><span>${m.full_name||m.email}</span></div>
@@ -1720,7 +1742,8 @@ async function loadDashboard() {
 // ================================================================
 async function loadRoster() {
   // نسخة للقراءة فقط من قائمة الأعضاء — تظهر لكل الأعضاء، من غير أي أزرار إجراءات
-  const { data: members } = await sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL).order('xp', {ascending:false});
+  const { data: members } = await sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL);
+  members?.sort(compareMembers);
   const el2 = el('roster-list');
   if (!el2) return;
   el2.innerHTML = members?.length ? members.map(m => `
@@ -1738,7 +1761,8 @@ async function loadRoster() {
 async function loadMembers() {
   if (!isLeader) return;
   // القائد مش في قائمة الأعضاء
-  const { data: members } = await sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL).order('xp', {ascending:false});
+  const { data: members } = await sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL);
+  members?.sort(compareMembers);
   el('members-list').innerHTML = members?.length ? members.map(m => `
     <div class="t-row" style="grid-template-columns:1.8fr 1.2fr .6fr 1.4fr .8fr 2.2fr">
       <div class="mn-cell">
