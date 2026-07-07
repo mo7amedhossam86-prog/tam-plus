@@ -1,78 +1,57 @@
-// supabase/functions/send-push/index.ts
-// Edge Function بتبعت Web Push حقيقي (خارج الموقع) للمستخدمين
-// بتستقبل: { user_id, title, body, url }  →  لعضو واحد
-//        أو: { all: true, title, body, url }  →  لكل الأعضاء
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
-import { createClient } from "npm:@supabase/supabase-js@2";
-import webpush from "npm:web-push@3.6.7";
+const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY")!;
+const SENDER_EMAIL = "mo7amedhossam86@gmail.com"; // نفس الإيميل اللي وثقته في Brevo
+const SENDER_NAME = "TAM+";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
-const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
-const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@example.com";
-
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-
+serve(async (req) => {
   try {
-    const { user_id, all, title, body, url } = await req.json();
-    if (!title) {
-      return new Response(JSON.stringify({ error: "title مطلوب" }), { status: 400, headers: corsHeaders });
+    const payload = await req.json();
+    const email = payload?.user?.email;
+    const token = payload?.email_data?.token;
+    const actionType = payload?.email_data?.email_action_type;
+
+    if (!email || !token) {
+      return new Response(JSON.stringify({ error: "missing email or token" }), { status: 400 });
     }
 
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    let subject = "كود التأكيد - TAM+";
+    let title = "كود تأكيد التسجيل";
+    if (actionType === "recovery") { subject = "كود استعادة كلمة المرور - TAM+"; title = "كود استعادة كلمة المرور"; }
+    if (actionType === "email_change") { subject = "كود تأكيد تغيير الإيميل - TAM+"; title = "كود تأكيد تغيير الإيميل"; }
 
-    let query = supabase.from("push_subscriptions").select("*");
-    if (!all) {
-      if (!user_id) return new Response(JSON.stringify({ error: "user_id مطلوب" }), { status: 400, headers: corsHeaders });
-      query = query.eq("user_id", user_id);
-    }
+    const html = `
+      <div style="font-family:sans-serif;text-align:center;padding:24px;direction:rtl">
+        <h2>${title}</h2>
+        <p>الكود بتاعك هو:</p>
+        <h1 style="letter-spacing:8px;color:#111">${token}</h1>
+        <p style="color:#666;font-size:13px">الكود صالح لمدة محدودة، متشاركوش مع حد.</p>
+      </div>`;
 
-    const { data: subs, error } = await query;
-    if (error) throw error;
-    if (!subs || subs.length === 0) {
-      return new Response(JSON.stringify({ sent: 0, note: "مفيش اشتراكات push لهذا المستخدم" }), { headers: corsHeaders });
-    }
-
-    const payload = JSON.stringify({ title, body: body || "", url: url || "./" });
-    const expiredEndpoints: string[] = [];
-
-    const results = await Promise.allSettled(
-      subs.map((s) =>
-        webpush.sendNotification(
-          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          payload
-        ).catch((err) => {
-          // 404/410 يعني الاشتراك ده مبقاش موجود (المستخدم شال الإذن أو الموقع من متصفحه)
-          if (err.statusCode === 404 || err.statusCode === 410) expiredEndpoints.push(s.endpoint);
-          throw err;
-        })
-      )
-    );
-
-    // تنضيف الاشتراكات المنتهية من قاعدة البيانات
-    if (expiredEndpoints.length > 0) {
-      await supabase.from("push_subscriptions").delete().in("endpoint", expiredEndpoints);
-    }
-
-    const sent = results.filter((r) => r.status === "fulfilled").length;
-    const failed = results.length - sent;
-
-    return new Response(JSON.stringify({ sent, failed, total: subs.length }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+        to: [{ email }],
+        subject,
+        htmlContent: html,
+      }),
     });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.log("Brevo API error:", errText);
+      return new Response(JSON.stringify({ error: errText }), { status: 500 });
+    }
+
+    return new Response(JSON.stringify({}), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message || String(e) }), {
-      status: 500,
-      headers: corsHeaders,
-    });
+    console.log("send-email hook error:", e);
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500 });
   }
 });

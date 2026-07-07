@@ -628,10 +628,19 @@ select.inp{cursor:pointer}
           <div id="world-chat-msgs" style="height:340px;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px">
             <div style="text-align:center;color:var(--muted);font-size:11px">جاري تحميل الرسائل...</div>
           </div>
+          <div id="world-voice-bar" style="display:none;align-items:center;gap:8px;padding:6px 2px;font-size:11px;color:var(--red)">
+            <i class="ti ti-mic-2" style="animation:pulse 1s infinite"></i>
+            <span>جاري التسجيل... <b id="world-voice-timer">0:00</b></span>
+            <button class="send-btn" style="background:var(--surface);border:1px solid var(--border);margin-right:auto" onclick="cancelVoiceRecording()" title="إلغاء"><i class="ti ti-x" style="font-size:14px"></i></button>
+          </div>
           <div id="world-inp-row" style="display:flex;gap:8px;align-items:center">
+            <input type="file" id="world-file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip" style="display:none" onchange="onWorldFileSelected()">
+            <button class="send-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="document.getElementById('world-file').click()" title="إرفاق ملف/صورة"><i class="ti ti-paperclip" style="font-size:14px;color:var(--muted)"></i></button>
+            <button class="send-btn" id="world-mic-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="toggleVoice('world')" title="رسالة صوتية"><i class="ti ti-microphone" style="font-size:14px;color:var(--muted)"></i></button>
             <input class="inp" id="world-msg-inp" placeholder="اكتب إعلان لكل الأعضاء..." style="flex:1" onkeypress="if(event.key==='Enter')sendWorldMsg()">
             <button class="send-btn" id="world-send-btn" onclick="sendWorldMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
           </div>
+          <div id="world-file-preview" style="display:none;padding:4px 2px;font-size:10px;color:var(--gold)"></div>
         </div>
       </div>
 
@@ -2463,9 +2472,9 @@ async function delNews(id) {
 // 💬 قائمة المحادثات — بتشمل كل الأعضاء (والقائد) اللي ليك معاهم رسائل أو ممكن تبدأ معاهم محادثة
 // كل عنصر بيوريك آخر رسالة وعدد الرسائل الغير مقروءة، وبيترتب الأحدث والغير مقروء الأول
 async function initChat() {
-  // كل البروفايلات النشطة ما عدا نفسي (تشمل القائد لو أنا عضو، وتشمل كل الأعضاء لو أنا القائد)
+  // كل البروفايلات النشطة: القائد يشوف كل الأعضاء، بس العضو العادي يشوف القائد بس (مينفعش عضو يكلم عضو تاني)
   let q = sb.from('profiles').select('*').eq('status','active');
-  q = isLeader ? q.neq('email', LEADER_EMAIL) : q.neq('id', currentUser.id);
+  q = isLeader ? q.neq('email', LEADER_EMAIL) : q.eq('email', LEADER_EMAIL);
   const { data: people } = await q;
   if (!people?.length) {
     el('chat-list').innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px">${isLeader ? 'لا يوجد أعضاء بعد' : 'لا يوجد أشخاص متاحين للمحادثة بعد'}</div>`;
@@ -3146,6 +3155,7 @@ let voiceRecorder = null, voiceChunks = [], voiceContext = null, voiceStream = n
 async function toggleVoice(context) {
   if (voiceRecorder && voiceRecorder.state === 'recording') { stopVoiceRecording(); return; }
   if (context === 'private' && !currentChatUserId) { alert('اختر محادثة أولاً'); return; }
+  if (context === 'world' && !isLeader) { return; } // مينفعش غير القائد يبعت في شات العالم
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -3171,14 +3181,14 @@ function updateVoiceTimer(context) {
   const secs = Math.floor((Date.now() - voiceStartTime) / 1000);
   const m = Math.floor(secs / 60), s = secs % 60;
   const label = (m + ':' + String(s).padStart(2,'0'));
-  const idEl = el(context === 'private' ? 'c-voice-timer' : 'room-voice-timer');
+  const idEl = el(context === 'private' ? 'c-voice-timer' : context === 'world' ? 'world-voice-timer' : 'room-voice-timer');
   if (idEl) idEl.textContent = label;
   if (secs >= 120) stopVoiceRecording(); // حد أقصى دقيقتين للرسالة الصوتية
 }
 
 function showVoiceUI(context, recording) {
-  const bar = el(context === 'private' ? 'c-voice-bar' : 'room-voice-bar');
-  const micBtn = el(context === 'private' ? 'c-mic-btn' : 'room-mic-btn');
+  const bar = el(context === 'private' ? 'c-voice-bar' : context === 'world' ? 'world-voice-bar' : 'room-voice-bar');
+  const micBtn = el(context === 'private' ? 'c-mic-btn' : context === 'world' ? 'world-mic-btn' : 'room-mic-btn');
   if (bar) bar.style.display = recording ? 'flex' : 'none';
   if (micBtn) micBtn.innerHTML = recording
     ? '<i class="ti ti-player-stop" style="font-size:14px;color:var(--red)"></i>'
@@ -3215,7 +3225,7 @@ async function onVoiceStopped() {
     await sb.from('messages').insert({ chat_key: chatKey, sender_id: currentUser.id, receiver_id: currentChatUserId, content: '', media_url: media.url, media_type: 'audio' });
     sendPushTo(currentChatUserId, userProfile?.full_name || 'رسالة جديدة', '🎤 رسالة صوتية جديدة', '/');
     await loadMessages(currentChatUserId);
-  } else {
+  } else if (ctx === 'room') {
     setSendingState(true, 'room');
     const media = await uploadChatMedia(file, 'room-elite');
     setSendingState(false, 'room');
@@ -3224,6 +3234,17 @@ async function onVoiceStopped() {
     if (error) { alert('لازم تكون عضو في غرفة النخبة عشان تبعت رسالة'); return; }
     sendPushToRoom('💬 رسالة جديدة في غرفة النخبة', `${userProfile?.full_name || 'عضو'}: 🎤 رسالة صوتية`, '/', currentUser.id);
     await loadRoomMessages();
+  }
+  if (ctx === 'world') {
+    if (!isLeader) return;
+    setSendingState(true, 'world');
+    const media = await uploadChatMedia(file, 'world');
+    setSendingState(false, 'world');
+    if (!media) return;
+    const { error } = await sb.from('world_messages').insert({ sender_id: currentUser.id, sender_name: userProfile?.full_name || 'القائد', content: '', media_url: media.url, media_type: 'audio' });
+    if (error) { alert('❌ الرسالة ما اتبعتتش: ' + error.message); return; }
+    sendPushToAll('📣 رسالة جديدة من القائد', '🎤 رسالة صوتية جديدة', '/');
+    loadWorldChat();
   }
 }
 
@@ -3560,14 +3581,43 @@ async function loadWorldChat() {
   box.scrollTop = box.scrollHeight;
 }
 
+let pendingWorldFile = null;
+async function onWorldFileSelected() {
+  const inp = el('world-file');
+  let file = inp.files?.[0] || null;
+  const prev = el('world-file-preview');
+  if (!file) { pendingWorldFile = null; return; }
+  if (file.size > MAX_ATTACH_MB*1024*1024) {
+    alert(`الملف كبير جداً (أكبر من ${MAX_ATTACH_MB} ميجا)، اختار ملف أصغر`);
+    inp.value = ''; pendingWorldFile = null; if (prev) prev.style.display='none';
+    return;
+  }
+  if (file.type.startsWith('image/')) {
+    if (prev) { prev.style.display='block'; prev.textContent = '⏳ جاري تجهيز الصورة...'; }
+    file = await compressImageFile(file);
+  }
+  pendingWorldFile = file;
+  if (prev) { prev.style.display='block'; prev.textContent = '📎 ' + file.name + ' — هيتبعت مع الرسالة الجاية'; }
+}
+
 async function sendWorldMsg() {
   if (!isLeader) return;
   const content = v('world-msg-inp');
-  if (!content.trim()) return;
+  if (!content.trim() && !pendingWorldFile) return;
   const row = { sender_id: currentUser.id, sender_name: userProfile?.full_name || 'القائد', content: content.trim() };
+  if (pendingWorldFile) {
+    setSendingState(true, 'world');
+    const media = await uploadChatMedia(pendingWorldFile, 'world');
+    setSendingState(false, 'world');
+    if (!media) return; // فشل الرفع — منبعتش رسالة فاضية
+    row.media_url = media.url; row.media_type = media.type;
+    pendingWorldFile = null;
+    el('world-file').value = '';
+    if (el('world-file-preview')) el('world-file-preview').style.display = 'none';
+  }
   const { error } = await sb.from('world_messages').insert(row);
   if (error) { alert('❌ الرسالة ما اتبعتتش: ' + error.message); return; }
-  sendPushToAll('📣 رسالة جديدة من القائد', row.content, '/');
+  sendPushToAll('📣 رسالة جديدة من القائد', row.content || '📎 مرفق جديد', '/');
   el('world-msg-inp').value = '';
   loadWorldChat();
 }
@@ -4313,7 +4363,13 @@ window.addEventListener('load', () => {
      );
      -- الرسائل الخاصة: كل من له علاقة يقدر يقرأ (القائد وصاحب الرسالة فقط)
      CREATE POLICY "read own messages" ON messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
-     CREATE POLICY "send messages" ON messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+     -- إرسال الرسائل: العضو العادي يقدر يبعت للقائد بس، القائد يقدر يبعت لأي عضو (مينفعش عضو يكلم عضو تاني)
+     CREATE POLICY "send messages" ON messages FOR INSERT WITH CHECK (
+       auth.uid() = sender_id AND (
+         EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+         OR receiver_id IN (SELECT id FROM profiles WHERE role = 'leader')
+       )
+     );
      -- 🛠️ ناقصة من قبل: من غيرها تعديل/حذف رسائل الشات (وتعليم رسالة كمقروءة) كان بيترفض بصمت
      CREATE POLICY "leader edits messages" ON messages FOR UPDATE USING (
        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
