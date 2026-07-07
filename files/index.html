@@ -25,9 +25,11 @@
 
      ⚙️ إعدادات مهمة لازم تتظبط من Supabase Dashboard (مش من الكود):
      1- Authentication → Providers → Email → "Email OTP Expiration" خليها 600 (يعني 10 دقايق)
-     2- Authentication → Email Templates → "Reset Password" غيّر القالب يستخدم {{ .Token }} بدل {{ .ConfirmationURL }} عشان يوصل كود 6 أرقام مش لينك
+     2- Authentication → Email Templates → "Confirm signup" غيّر القالب يستخدم {{ .Token }} بدل {{ .ConfirmationURL }}
+        عشان تأكيد الإيميل يبقى بكود 6 أرقام بدل لينك (اللينك بيتكسر كتير بسبب سكانرات الإيميل زي Outlook Safe Links)
+     3- Authentication → Email Templates → "Reset Password" غيّر القالب يستخدم {{ .Token }} بدل {{ .ConfirmationURL }} عشان يوصل كود 6 أرقام مش لينك
         وممكن تضيف شعار الموقع جوه الـ HTML بتاع القالب ده بـ <img src="رابط اللوجو">
-     3- Authentication → Settings → SMTP Settings → فعّل Custom SMTP (Resend/SendGrid/etc) وحط "Sender Name" = اسم موقعك (TAM+ مثلاً)
+     4- Authentication → Settings → SMTP Settings → فعّل Custom SMTP (Resend/SendGrid/etc) وحط "Sender Name" = اسم موقعك (TAM+ مثلاً)
         عشان تبعت باسم الموقع بدل ما تيجي من no-reply@supabase.io
 
      🔑 عشان "نسيت كلمة المرور" يشتغل ويوصل الإيميل فعلاً:
@@ -918,6 +920,7 @@ async function setupDatabase() {
 // ================================================================
 let justConfirmedEmail = false;
 let authRedirectError = null;
+let skipNextAutoLogin = false; // بيتفعّل مؤقتاً وقت تأكيد كود إيميل عضو جديد (مش القائد) عشان مايدخلش التطبيق قبل موافقة القائد
 (function checkEmailConfirmRedirect() {
   // لما المستخدم يدوس على لينك تأكيد الإيميل، Supabase بيرجّعه لموقعنا ومعاه باراميتر زي ?type=signup
   // (أو جوه الـ hash #type=signup حسب نوع الـ flow). بنقرأه هنا بس من غير ما نمسحه من الرابط،
@@ -948,7 +951,7 @@ async function init() {
       return;
     }
     if (event === 'SIGNED_IN' && session) {
-      if (isPasswordRecovery) return; // لسه بيحط كلمة مرور جديدة — منسيبوش يدخل التطبيق تلقائي
+      if (isPasswordRecovery || skipNextAutoLogin) return; // لسه بيحط كلمة مرور جديدة، أو دي جلسة تأكيد كود إيميل عضو مش لازم تدخّله التطبيق
       currentUser = session.user;
       // دلوقتي supabase-js خلص قراءة الرابط وسجّل الجلسة، ينفع نظّف الرابط من التوكنز بأمان
       if (window.location.search || window.location.hash) {
@@ -1301,16 +1304,19 @@ async function doRegister() {
       document.querySelector('.auth-box').innerHTML = needsEmailConfirm ? `
         <div style="text-align:center;padding:10px 0">
           <div style="font-size:40px;margin-bottom:12px">📧</div>
-          <div style="font-size:16px;font-weight:700;margin-bottom:8px">أكّد بريدك الإلكتروني الأول</div>
-          <div style="font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:20px">
-            بعتنالك رسالة فيها لينك تأكيد على<br>
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px">أكّد بريدك الإلكتروني</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:16px">
+            بعتنالك كود مكوّن من 6 أرقام على<br>
             <b style="color:var(--gold)">${email}</b><br>
-            لازم تدوس عليه عشان نتأكد إن الإيميل حقيقي، وبعدها حسابك هيبقى في انتظار موافقة القائد
+            اكتبه تحت عشان نتأكد إن الإيميل حقيقي، وبعدها حسابك هيبقى في انتظار موافقة القائد
           </div>
-          <div style="background:rgba(255,179,0,.08);border:1px solid rgba(255,179,0,.2);border-radius:11px;padding:12px;font-size:11px;color:var(--gold);margin-bottom:16px">
-            🔔 متلاقيش الإيميل؟ راجع الـ Spam، أو ارجع سجّل بنفس البيانات تاني بعد شوية
+          <div class="form-group"><input class="inp" id="signup-otp-inp" maxlength="6" inputmode="numeric" placeholder="اكتب الكود المكوّن من 6 أرقام" style="text-align:center;letter-spacing:4px;font-size:16px" onkeypress="if(event.key==='Enter')confirmSignupOtp('${email}',false)"></div>
+          <div class="auth-err" id="signup-otp-err"></div>
+          <div class="auth-ok" id="signup-otp-ok"></div>
+          <button class="btn-primary" id="signup-otp-btn" onclick="confirmSignupOtp('${email}',false)">تأكيد الكود</button>
+          <div style="margin-top:14px;font-size:11px;color:var(--muted)">
+            متلاقيش الكود؟ راجع الـ Spam، أو <a href="javascript:void(0)" onclick="resendSignupOtp('${email}')" style="color:var(--blue);text-decoration:none">اطلب كود جديد</a>
           </div>
-          <button class="btn-primary" onclick="location.reload()">العودة لتسجيل الدخول</button>
         </div>` : `
         <div style="text-align:center;padding:10px 0">
           <div style="font-size:40px;margin-bottom:12px">⏳</div>
@@ -1328,15 +1334,69 @@ async function doRegister() {
       return;
     }
 
-    // القائد لو محتاج يأكد إيميله الأول (لو Confirm email مفعّلة) — مفيش session لسه فيوضحله كده
+    // القائد لو محتاج يأكد إيميله الأول (لو Confirm email مفعّلة) — مفيش session لسه، فنطلب منه الكود
     if (isLeaderEmail && needsEmailConfirm) {
       btn.disabled = false; btn.textContent = 'إنشاء الحساب';
-      setOk('reg-ok', `✓ اتبعت رسالة تأكيد على ${email} — دوس على اللينك اللي فيها الأول، وبعدين رجع سجل دخولك`);
+      document.getElementById('form-login').style.display = 'none';
+      document.getElementById('form-register').style.display = 'none';
+      document.querySelectorAll('.auth-tab').forEach(t => t.style.display = 'none');
+      document.querySelector('.auth-box').innerHTML = `
+        <div style="text-align:center;padding:10px 0">
+          <div style="font-size:40px;margin-bottom:12px">📧</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px">أكّد بريدك الإلكتروني</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:16px">
+            بعتنالك كود مكوّن من 6 أرقام على<br>
+            <b style="color:var(--gold)">${email}</b>
+          </div>
+          <div class="form-group"><input class="inp" id="signup-otp-inp" maxlength="6" inputmode="numeric" placeholder="اكتب الكود المكوّن من 6 أرقام" style="text-align:center;letter-spacing:4px;font-size:16px" onkeypress="if(event.key==='Enter')confirmSignupOtp('${email}',true)"></div>
+          <div class="auth-err" id="signup-otp-err"></div>
+          <div class="auth-ok" id="signup-otp-ok"></div>
+          <button class="btn-primary" id="signup-otp-btn" onclick="confirmSignupOtp('${email}',true)">تأكيد الكود</button>
+          <div style="margin-top:14px;font-size:11px;color:var(--muted)">
+            متلاقيش الكود؟ راجع الـ Spam، أو <a href="javascript:void(0)" onclick="resendSignupOtp('${email}')" style="color:var(--blue);text-decoration:none">اطلب كود جديد</a>
+          </div>
+        </div>`;
       return;
     }
   }
 
   btn.disabled = false; btn.textContent = 'إنشاء الحساب';
+}
+
+async function confirmSignupOtp(email, isLeaderEmail) {
+  const code = v('signup-otp-inp').trim();
+  setErr('signup-otp-err',''); setOk('signup-otp-ok','');
+  if (!/^\d{6}$/.test(code)) { setErr('signup-otp-err','اكتب الكود المكوّن من 6 أرقام صح'); return; }
+  const btn = document.getElementById('signup-otp-btn');
+  btn.disabled = true; btn.textContent = 'جاري التأكيد...';
+  if (!isLeaderEmail) skipNextAutoLogin = true;
+  const { error } = await sb.auth.verifyOtp({ email, token: code, type: 'signup' });
+  if (error) {
+    skipNextAutoLogin = false;
+    btn.disabled = false; btn.textContent = 'تأكيد الكود';
+    setErr('signup-otp-err', getArabicError(error.message));
+    return;
+  }
+  if (isLeaderEmail) return; // القائد هيدخل التطبيق أوتوماتيك (onAuthStateChange هيتكفل بالباقي)
+  await sb.auth.signOut();
+  document.querySelector('.auth-box').innerHTML = `
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:40px;margin-bottom:12px">⏳</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px">تم تأكيد إيميلك!</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:20px">
+        حسابك دلوقتي في انتظار موافقة القائد<br>
+        <b style="color:var(--gold)">${email}</b><br>
+        بعد الموافقة ادخل من تسجيل الدخول
+      </div>
+      <button class="btn-primary" onclick="location.reload()">العودة لتسجيل الدخول</button>
+    </div>`;
+}
+
+async function resendSignupOtp(email) {
+  setErr('signup-otp-err',''); setOk('signup-otp-ok','');
+  const { error } = await sb.auth.resend({ type: 'signup', email });
+  if (error) { setErr('signup-otp-err', getArabicError(error.message)); return; }
+  setOk('signup-otp-ok', '✓ اتبعت كود جديد على إيميلك');
 }
 
 // ================================================================
