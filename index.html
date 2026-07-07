@@ -40,7 +40,7 @@
 <script>
   const SUPABASE_URL = 'https://hdfxiqsgzttiulsjcrgb.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkZnhpcXNnenR0aXVsc2pjcmdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNDg1MTAsImV4cCI6MjA5MzkyNDUxMH0.T-qHpbGwNP9pOmb6Ipa4lBb6NwLvGUJ2rAg8aG_lCso';
-  const LEADER_EMAIL = 'mo7amedhossam86@leader.com';
+  const LEADER_EMAIL = 'mo7amedhossam86@gmail.com';
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -433,6 +433,7 @@ select.inp{cursor:pointer}
       <div class="form-group"><label class="form-label">اسم المستخدم (لازم ينتهي بـ TAM)</label><input class="inp" id="reg-name" placeholder="مثال: ExampleTAM"><div style="font-size:9px;color:var(--muted);margin-top:4px;line-height:1.6">حرف أول كابيتال، باقي الاسم سمول، وينتهي إجبارياً بـ TAM كابيتال بالكامل ومتصلة — بدون أرقام أو مسافات. مثال صحيح: <b style="color:var(--gold)">AhmedTAM</b></div></div>
       <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" id="reg-email" type="email" placeholder="example@email.com"></div>
       <div class="form-group"><label class="form-label">كلمة المرور (8 أحرف على الأقل)</label><div class="pass-wrap"><input class="inp" id="reg-pass" type="password" placeholder="••••••••"><button type="button" class="pass-toggle" onclick="togglePass('reg-pass',this)"><i class="ti ti-eye"></i></button></div></div>
+      <div class="form-group"><label class="form-label">تأكيد كلمة المرور</label><div class="pass-wrap"><input class="inp" id="reg-pass2" type="password" placeholder="••••••••"><button type="button" class="pass-toggle" onclick="togglePass('reg-pass2',this)"><i class="ti ti-eye"></i></button></div></div>
       <div class="auth-err" id="reg-err"></div>
       <div class="auth-ok" id="reg-ok"></div>
       <button class="btn-primary" id="reg-btn" onclick="doRegister()">إنشاء الحساب</button>
@@ -737,7 +738,7 @@ select.inp{cursor:pointer}
             <h4>🔒 أمان الموقع</h4>
             <div style="font-size:11px;color:var(--muted);line-height:2.2">
               <div>RLS: <b style="color:var(--green)">✓ مفعّل</b></div>
-              <div>الإيميل القائد: <b style="color:var(--gold)">mo7amedhossam86@leader.com</b></div>
+              <div>الإيميل القائد: <b style="color:var(--gold)">mo7amedhossam86@gmail.com</b></div>
               <div>قاعدة البيانات: <b style="color:var(--text)">Supabase PostgreSQL</b></div>
               <div>الإصدار: <b style="color:var(--text)">TAM+ v2.1</b></div>
             </div>
@@ -1169,13 +1170,14 @@ async function doLogin() {
 }
 
 async function doRegister() {
-  const name = v('reg-name').trim(), email = v('reg-email'), pass = v('reg-pass');
-  if (!name || !email || !pass) { setErr('reg-err','يرجى ملء جميع الحقول'); return; }
+  const name = v('reg-name').trim(), email = v('reg-email'), pass = v('reg-pass'), pass2 = v('reg-pass2');
+  if (!name || !email || !pass || !pass2) { setErr('reg-err','يرجى ملء جميع الحقول'); return; }
   if (!USERNAME_REGEX.test(name)) {
     setErr('reg-err','اسم غير صالح: لازم يبدأ بحرف كابيتال، والباقي سمول، وينتهي إجبارياً بـ TAM كابيتال ومتصلة (بدون أرقام أو مسافات) — مثال: AhmedTAM');
     return;
   }
   if (pass.length < 8) { setErr('reg-err','كلمة المرور 8 أحرف على الأقل'); return; }
+  if (pass !== pass2) { setErr('reg-err','كلمة المرور وتأكيدها مش متطابقين'); return; }
   // منع تكرار نفس الاسم أو اسم مشابه له (بتجاهل حالة الأحرف) — كل اسم لازم يكون فريد بين الأعضاء
   const { data: existingNames } = await sb.from('profiles').select('full_name').neq('status','deleted');
   const nameTaken = (existingNames||[]).some(p => (p.full_name||'').toLowerCase() === name.toLowerCase());
@@ -1187,6 +1189,16 @@ async function doRegister() {
   const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
   
   if (error) { setErr('reg-err', getArabicError(error.message)); btn.disabled = false; btn.textContent = 'إنشاء الحساب'; return; }
+
+  // لو الإيميل ده مسجل قبل كده ومؤكد بالفعل، Supabase بيرجّع identities فاضية من غير ما يرمي error
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    setErr('reg-err', 'هذا البريد الإلكتروني مسجل بالفعل — جرب تسجيل الدخول بدل كده');
+    btn.disabled = false; btn.textContent = 'إنشاء الحساب';
+    return;
+  }
+
+  // لو "Confirm email" مفعّلة في إعدادات Supabase، مش هيرجع session فوراً — لازم يأكد إيميله الأول
+  const needsEmailConfirm = data.user && !data.session;
 
   // إنشاء profile في انتظار موافقة القائد
   if (data.user) {
@@ -1215,7 +1227,20 @@ async function doRegister() {
       document.getElementById('form-login').style.display = 'none';
       document.getElementById('form-register').style.display = 'none';
       document.querySelectorAll('.auth-tab').forEach(t => t.style.display = 'none');
-      document.querySelector('.auth-box').innerHTML = `
+      document.querySelector('.auth-box').innerHTML = needsEmailConfirm ? `
+        <div style="text-align:center;padding:10px 0">
+          <div style="font-size:40px;margin-bottom:12px">📧</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px">أكّد بريدك الإلكتروني الأول</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:20px">
+            بعتنالك رسالة فيها لينك تأكيد على<br>
+            <b style="color:var(--gold)">${email}</b><br>
+            لازم تدوس عليه عشان نتأكد إن الإيميل حقيقي، وبعدها حسابك هيبقى في انتظار موافقة القائد
+          </div>
+          <div style="background:rgba(255,179,0,.08);border:1px solid rgba(255,179,0,.2);border-radius:11px;padding:12px;font-size:11px;color:var(--gold);margin-bottom:16px">
+            🔔 متلاقيش الإيميل؟ راجع الـ Spam، أو ارجع سجّل بنفس البيانات تاني بعد شوية
+          </div>
+          <button class="btn-primary" onclick="location.reload()">العودة لتسجيل الدخول</button>
+        </div>` : `
         <div style="text-align:center;padding:10px 0">
           <div style="font-size:40px;margin-bottom:12px">⏳</div>
           <div style="font-size:16px;font-weight:700;margin-bottom:8px">تم إنشاء حسابك!</div>
@@ -1229,6 +1254,13 @@ async function doRegister() {
           </div>
           <button class="btn-primary" onclick="location.reload()">العودة لتسجيل الدخول</button>
         </div>`;
+      return;
+    }
+
+    // القائد لو محتاج يأكد إيميله الأول (لو Confirm email مفعّلة) — مفيش session لسه فيوضحله كده
+    if (isLeaderEmail && needsEmailConfirm) {
+      btn.disabled = false; btn.textContent = 'إنشاء الحساب';
+      setOk('reg-ok', `✓ اتبعت رسالة تأكيد على ${email} — دوس على اللينك اللي فيها الأول، وبعدين رجع سجل دخولك`);
       return;
     }
   }
