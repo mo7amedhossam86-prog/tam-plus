@@ -901,6 +901,29 @@ async function setupDatabase() {
 // ================================================================
 //  AUTH
 // ================================================================
+let justConfirmedEmail = false;
+let authRedirectError = null;
+(function checkEmailConfirmRedirect() {
+  // لما المستخدم يدوس على لينك تأكيد الإيميل، Supabase بيرجّعه لموقعنا ومعاه باراميتر زي ?type=signup
+  // (أو جوه الـ hash #type=signup حسب نوع الـ flow). بنقرأه هنا بس من غير ما نمسحه من الرابط،
+  // عشان مكتبة supabase-js لسه محتاجة تقرأ نفس الرابط ده (فيه كمان كود/توكن الجلسة) عشان تسجّل الدخول أوتوماتيك
+  try {
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const type = search.get('type') || hash.get('type');
+    if (type === 'signup' || type === 'email_change' || type === 'invite') {
+      justConfirmedEmail = true;
+    }
+    // لينك منتهي الصلاحية أو مستخدم قبل كده — Supabase بيرجّع error في الـ hash، دي مش توكنز جلسة فينضف الرابط على طول
+    const errCode = search.get('error_code') || hash.get('error_code');
+    const errDesc = search.get('error_description') || hash.get('error_description');
+    if (errCode || search.get('error') || hash.get('error')) {
+      authRedirectError = { code: errCode || '', desc: errDesc ? decodeURIComponent(errDesc.replace(/\+/g,' ')) : '' };
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  } catch(e) {}
+})();
+
 async function init() {
   if (!sb) return;
 
@@ -912,6 +935,10 @@ async function init() {
     if (event === 'SIGNED_IN' && session) {
       if (isPasswordRecovery) return; // لسه بيحط كلمة مرور جديدة — منسيبوش يدخل التطبيق تلقائي
       currentUser = session.user;
+      // دلوقتي supabase-js خلص قراءة الرابط وسجّل الجلسة، ينفع نظّف الرابط من التوكنز بأمان
+      if (window.location.search || window.location.hash) {
+        try { window.history.replaceState({}, document.title, window.location.pathname); } catch(e) {}
+      }
       const ok = await loadUserProfile();
       if (ok !== false) { showApp(); registerPushNotifications(); }
     } else if (event === 'SIGNED_OUT') {
@@ -1002,10 +1029,10 @@ async function loadUserProfile() {
     document.querySelectorAll('.auth-tab').forEach(t => t.style.display = 'none');
     document.querySelector('.auth-box').innerHTML = `
       <div style="text-align:center;padding:10px 0">
-        <div style="font-size:40px;margin-bottom:12px">⏳</div>
-        <div style="font-size:16px;font-weight:700;margin-bottom:8px">في انتظار الموافقة</div>
+        <div style="font-size:40px;margin-bottom:12px">${justConfirmedEmail ? '✅' : '⏳'}</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">${justConfirmedEmail ? 'تم تأكيد بريدك الإلكتروني ✅' : 'في انتظار الموافقة'}</div>
         <div style="font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:20px">
-          حسابك بانتظار مراجعة القائد<br>
+          ${justConfirmedEmail ? 'تم تأكيد إيميلك بنجاح، و' : ''}حسابك بانتظار مراجعة القائد<br>
           <b style="color:var(--gold)">${data.email}</b><br>
           بعد الموافقة سجل دخولك من جديد
         </div>
@@ -1039,6 +1066,35 @@ function showAuth() {
   hide('loading');
   show('auth-screen');
   hide('app');
+  if (authRedirectError) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.style.display = 'none');
+    const isExpired = authRedirectError.code === 'otp_expired';
+    document.querySelector('.auth-box').innerHTML = `
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:40px;margin-bottom:12px">⏰</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">${isExpired ? 'لينك التأكيد منتهي الصلاحية' : 'حصلت مشكلة في اللينك'}</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:18px">
+          ${isExpired ? 'اللينك ده إما مستخدم قبل كده أو خلصت مدته. اكتب إيميلك تحت وهنبعتلك لينك تأكيد جديد.' : 'جرب تسجل دخولك أو اعمل حساب جديد.'}
+        </div>
+        <div class="form-group" style="text-align:right"><input class="inp" id="resend-email" type="email" placeholder="اكتب إيميلك اللي سجلت بيه"></div>
+        <div class="auth-err" id="resend-err"></div>
+        <div class="auth-ok" id="resend-ok"></div>
+        <button class="btn-primary" id="resend-btn" onclick="resendConfirmEmail()">إعادة إرسال لينك التأكيد</button>
+        <div style="margin-top:14px"><a href="javascript:void(0)" onclick="authRedirectError=null;location.reload()" style="font-size:11px;color:var(--blue);text-decoration:none">العودة لتسجيل الدخول</a></div>
+      </div>`;
+  }
+}
+
+async function resendConfirmEmail() {
+  const email = v('resend-email');
+  setErr('resend-err',''); setOk('resend-ok','');
+  if (!email) { setErr('resend-err','اكتب إيميلك الأول'); return; }
+  const btn = document.getElementById('resend-btn');
+  btn.disabled = true; btn.textContent = 'جاري الإرسال...';
+  const { error } = await sb.auth.resend({ type: 'signup', email });
+  btn.disabled = false; btn.textContent = 'إعادة إرسال لينك التأكيد';
+  if (error) { setErr('resend-err', getArabicError(error.message)); return; }
+  setOk('resend-ok', '✓ اتبعت لينك تأكيد جديد على إيميلك، افتحه واضغط عليه خلال دقايق قليلة');
 }
 
 async function showApp() {
