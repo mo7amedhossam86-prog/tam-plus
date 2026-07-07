@@ -326,6 +326,9 @@ select.inp{cursor:pointer}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
+/* 🦅 شارة اللقب (زي "الصقر") اللي بتظهر جنب اسم العضو */
+.rank-title-badge{display:inline-block;font-size:10px;font-weight:700;color:var(--gold);background:rgba(255,179,0,.12);border:1px solid rgba(255,179,0,.3);border-radius:10px;padding:1px 8px;vertical-align:middle;margin-right:5px}
+
 /* ===== MOBILE ===== */
 @media(max-width:768px){
   html,body{overflow:auto!important;height:auto!important}
@@ -336,6 +339,7 @@ select.inp{cursor:pointer}
   .topbar{padding:0 12px;height:50px}
   .topbar-name{font-size:16px}
   .role-badge{font-size:9px;padding:3px 8px}
+  .rank-title-badge{display:block;width:fit-content;margin:3px 0 0}
   .main-layout{flex-direction:column-reverse}
   .sidebar{width:100%;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:6px;gap:4px;border-left:none;border-top:1px solid var(--border);flex-wrap:nowrap;flex-shrink:0;order:2}
   .nav-section{display:none}
@@ -3688,7 +3692,7 @@ const RANK_TITLES = {
 function rankTitleHTML(rank) {
   const t = RANK_TITLES[rank];
   if (!t) return '';
-  return ` <span style="font-size:10px;font-weight:700;color:var(--gold);background:rgba(255,179,0,.12);border:1px solid rgba(255,179,0,.3);border-radius:10px;padding:1px 8px;vertical-align:middle" title="لقب">${t.icon} ${t.text}</span>`;
+  return `<span class="rank-title-badge" title="لقب">${t.icon} ${t.text}</span>`;
 }
 function rankNameHTML(m) {
   const name = m?.full_name || m?.email || 'عضو';
