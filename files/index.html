@@ -1628,11 +1628,15 @@ async function submitNewPassword() {
 }
 
 function getArabicError(msg) {
+  // دفاع ضد رسائل خطأ غريبة (زي "{}" أو undefined) بدل ما تتعرض للمستخدم زي ما هي
+  if (!msg || typeof msg !== 'string') { console.error('Auth error (raw):', msg); return 'حصل خطأ غير متوقع، جرب تاني بعد شوية'; }
   if (msg.includes('Invalid login')) return 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
   if (msg.includes('already registered')) return 'هذا البريد الإلكتروني مسجل مسبقاً';
   if (msg.includes('security purposes') || msg.includes('rate limit')) return 'يرجى الانتظار قليلاً قبل إعادة المحاولة';
+  if (msg.toLowerCase().includes('smtp') || msg.includes('sending confirmation') || msg.includes('Error sending')) return 'فشل إرسال الإيميل — تأكد إن إعدادات SMTP في Supabase مظبوطة صح (الـ API key والدومين)';
   if (msg.includes('password')) return 'كلمة المرور ضعيفة جداً';
   if (msg.includes('email')) return 'بريد إلكتروني غير صالح';
+  if (/^\s*[{[]/.test(msg)) { console.error('Auth error (raw):', msg); return 'حصل خطأ غير متوقع من السيرفر — راجع Auth Logs في Supabase أو جرب تاني بعد شوية'; }
   return msg;
 }
 
