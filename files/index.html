@@ -200,8 +200,21 @@ select.inp{cursor:pointer}
 @keyframes legendGlow{0%,100%{box-shadow:0 0 0 1px rgba(255,215,0,.15) inset,0 10px 26px rgba(255,215,0,.12)}50%{box-shadow:0 0 0 1px rgba(255,215,0,.3) inset,0 14px 40px rgba(255,215,0,.32)}}
 .rank-crown-float{font-size:20px;position:absolute;top:8px;left:50%;transform:translateX(-50%);animation:floatCrown 2.2s ease-in-out infinite}
 @keyframes floatCrown{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-5px)}}
-.rank-reward{margin-top:8px;font-size:9.5px;color:var(--muted);line-height:1.5;display:flex;align-items:center;gap:4px;justify-content:center;text-align:center}
-.rank-reward i{color:var(--gold);font-size:11px;flex-shrink:0}
+.rank-reward{margin-top:10px;font-size:10px;color:var(--gold);line-height:1.5;display:flex;align-items:center;gap:6px;justify-content:center;text-align:center;background:rgba(255,179,0,.08);border:1px solid rgba(255,179,0,.25);border-radius:9px;padding:7px 8px;font-weight:600}
+.rank-reward i{color:var(--gold);font-size:13px;flex-shrink:0;animation:rewardGiftShake 2.4s ease-in-out infinite}
+@keyframes rewardGiftShake{0%,85%,100%{transform:rotate(0)}88%{transform:rotate(-12deg)}91%{transform:rotate(10deg)}94%{transform:rotate(-6deg)}97%{transform:rotate(0)}}
+
+/* ================================================================
+   💎 تأثيرات الرتب الخرافية — تُطبَّق على الأفاتار في كل الموقع
+   ================================================================ */
+@keyframes rkPulseGlow{0%,100%{box-shadow:var(--rk-s1)}50%{box-shadow:var(--rk-s2)}}
+@keyframes rkFireGlow{0%,100%{box-shadow:0 0 0 2px #FF6B35,0 0 10px 3px rgba(255,107,53,.65);transform:scale(1)}50%{box-shadow:0 0 0 2px #FFB300,0 0 18px 7px rgba(255,80,20,.75);transform:scale(1.04)}}
+@keyframes rkLightning{0%,100%{box-shadow:0 0 0 2px #E74C3C,0 0 8px 2px rgba(231,76,60,.6)}45%{box-shadow:0 0 0 2px #fff,0 0 16px 6px rgba(255,255,255,.85)}55%{box-shadow:0 0 0 2px #E74C3C,0 0 8px 2px rgba(231,76,60,.6)}}
+@keyframes rkWaveGlow{0%,100%{box-shadow:0 0 0 2px #2ECC71,0 0 8px 2px rgba(46,204,113,.5)}50%{box-shadow:0 0 0 3px #2ECC71,0 0 16px 6px rgba(46,204,113,.35)}}
+@keyframes rkRainbowSpin{0%{box-shadow:0 0 0 2px #FF00FF,0 0 14px 5px rgba(255,0,255,.55)}25%{box-shadow:0 0 0 2px #00E5FF,0 0 14px 5px rgba(0,229,255,.55)}50%{box-shadow:0 0 0 2px #FFD700,0 0 14px 5px rgba(255,215,0,.55)}75%{box-shadow:0 0 0 2px #39C96B,0 0 14px 5px rgba(57,201,107,.55)}100%{box-shadow:0 0 0 2px #FF00FF,0 0 14px 5px rgba(255,0,255,.55)}}
+@keyframes rkLegendaryGlow{0%,100%{box-shadow:0 0 0 2px #FFD700,0 0 16px 6px rgba(255,215,0,.6),0 0 32px 12px rgba(255,0,255,.25);transform:scale(1)}50%{box-shadow:0 0 0 3px #FFD700,0 0 26px 10px rgba(255,215,0,.85),0 0 46px 18px rgba(255,0,255,.4);transform:scale(1.05)}}
+@keyframes rkNameShimmer{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+.rk-badge-float{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:15px;animation:floatCrown 2.2s ease-in-out infinite;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));pointer-events:none;z-index:3}
 
 /* ===== PODIUM (Top 3 members) ===== */
 .podium-wrap{display:flex;align-items:flex-end;justify-content:center;gap:8px;padding:18px 4px 4px}
@@ -1504,7 +1517,9 @@ function renderSidebar() {
 function renderTopbar() {
   const topAv = document.getElementById('top-av');
   topAv.style.overflow = 'hidden';
-  topAv.innerHTML = avatarHTML(userProfile);
+  topAv.style.position = 'relative';
+  if (!isLeader) topAv.style.cssText += rankFXStyle(userProfile?.rank);
+  topAv.innerHTML = avatarHTML(userProfile) + (isLeader ? '' : rankBadgeHTML(userProfile?.rank));
   document.getElementById('top-role-badge').textContent = isLeader ? '👑 القائد الأعلى' : '👤 عضو';
   document.getElementById('top-role-badge').className = 'role-badge ' + (isLeader ? 'role-leader' : 'role-member');
   if (isLeader) { show('notif-btn'); }
@@ -1707,6 +1722,7 @@ function startRealtimeSubscriptions() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${currentUser.id}` }, (payload) => {
         if (payload.new?.rank !== payload.old?.rank) {
           addMemberNotif(`🎉 تمت ترقيتك إلى ${payload.new.rank}!`);
+          showRankUpModal(payload.new.rank);
         }
       }).subscribe();
     sb.channel("room-msg-member")
@@ -1785,8 +1801,8 @@ function renderTopMembersWidget(top) {
       <div class="podium-item p${place}" onclick="navigate(isLeader?'members':'ranks')">
         ${place===1?'<div class="podium-crown">👑</div>':''}
         <div class="podium-medal">${medals[i]}</div>
-        <div class="podium-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};border-color:${rankColor(m.rank)}">${avatarHTML(m)}</div>
-        <div class="podium-name">${m.full_name||m.email}</div>
+        <div class="podium-av" style="position:relative;background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};border-color:${rankColor(m.rank)};${rankFXStyle(m.rank)}">${avatarHTML(m)}${rankBadgeHTML(m.rank)}</div>
+        <div class="podium-name">${rankNameHTML(m)}</div>
         <span class="podium-rank" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)}">${m.rank||'Member'} · Lv.${m.level||1}</span>
         <div class="podium-xp">${m.xp||0} XP</div>
         <div class="podium-bar"></div>
@@ -1797,8 +1813,8 @@ function renderTopMembersWidget(top) {
   const restHTML = rest.length ? rest.map((m, idx) => `
     <div class="rest-rank-row" style="cursor:pointer" onclick="navigate(isLeader?'members':'ranks')">
       <span class="rest-rank-num">#${idx+4}</span>
-      <div class="m-av" style="width:26px;height:26px;font-size:11px;background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden">${avatarHTML(m)}</div>
-      <span style="flex:1;font-weight:600">${m.full_name||m.email}</span>
+      <div class="m-av" style="width:26px;height:26px;font-size:11px;background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden;${rankFXStyle(m.rank)}">${avatarHTML(m)}</div>
+      <span style="flex:1;font-weight:600">${rankNameHTML(m)}</span>
       <span class="r-badge" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)};font-size:9px">${m.rank||'Member'}</span>
       <span style="color:var(--xp);font-weight:700;font-size:11px">${m.xp||0} XP</span>
     </div>`).join('') : '';
@@ -1848,8 +1864,8 @@ async function loadRoster() {
   el2.innerHTML = members?.length ? members.map(m => `
     <div class="t-row" style="grid-template-columns:2fr 1.2fr .7fr 1.6fr">
       <div class="mn-cell">
-        <div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden">${avatarHTML(m)}</div>
-        <div><div>${m.full_name||m.email}</div>${m.band?`<span style="font-size:9px;color:var(--gold)">🏷 ${m.band}</span>`:''}</div>
+        <div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden;${rankFXStyle(m.rank)}">${avatarHTML(m)}</div>
+        <div><div>${rankNameHTML(m)}</div>${m.band?`<span style="font-size:9px;color:var(--gold)">🏷 ${m.band}</span>`:''}</div>
       </div>
       <span class="r-badge" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)}">${m.rank||'Member'}</span>
       <span style="font-size:13px;font-weight:700">Lv.${m.level||1}</span>
@@ -1865,8 +1881,8 @@ async function loadMembers() {
   el('members-list').innerHTML = members?.length ? members.map(m => `
     <div class="t-row" style="grid-template-columns:1.8fr 1.2fr .6fr 1.4fr .8fr 2.2fr">
       <div class="mn-cell">
-        <div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden">${avatarHTML(m)}</div>
-        <div><div>${m.full_name||m.email}</div>${m.band?`<span style="font-size:9px;color:var(--gold)">🏷 ${m.band}</span>`:''}</div>
+        <div class="m-av" style="background:${m.color||'#29ABE2'}22;color:${m.color||'#29ABE2'};overflow:hidden;${rankFXStyle(m.rank)}">${avatarHTML(m)}</div>
+        <div><div>${rankNameHTML(m)}</div>${m.band?`<span style="font-size:9px;color:var(--gold)">🏷 ${m.band}</span>`:''}</div>
       </div>
       <span class="r-badge" style="background:${rankColor(m.rank)}20;color:${rankColor(m.rank)}">${m.rank||'Member'}</span>
       <span style="font-size:13px;font-weight:700">Lv.${m.level||1}</span>
@@ -2266,8 +2282,8 @@ async function initChat() {
     }
     el('chat-list').innerHTML = members.map(m => `
       <div class="chat-item" id="chat-item-${m.id}" onclick="openChatWith('${m.id}','${m.full_name||m.email}','${m.color||'#29ABE2'}')">
-        <div class="chat-av" style="background:${m.color||'#29ABE2'}44;color:${m.color||'#29ABE2'};overflow:hidden">${avatarHTML(m)}</div>
-        <div style="overflow:hidden"><div class="chat-name">${m.full_name||m.email}</div><div class="chat-prev">${m.rank||'Member'}</div></div>
+        <div class="chat-av" style="background:${m.color||'#29ABE2'}44;color:${m.color||'#29ABE2'};overflow:hidden;${rankFXStyle(m.rank)}">${avatarHTML(m)}</div>
+        <div style="overflow:hidden"><div class="chat-name">${rankNameHTML(m)}</div><div class="chat-prev">${m.rank||'Member'}</div></div>
       </div>`).join('');
     // Auto open first member
     if (members[0]) openChatWith(members[0].id, members[0].full_name||members[0].email, members[0].color||'#29ABE2');
@@ -2711,8 +2727,8 @@ async function loadProfile() {
   const pct = Math.min(100, Math.round((p.xp||0)/(p.max_xp||50)*100));
   const rc = rankColor(p.rank);
   el('profile-card').innerHTML = `
-    <div class="profile-av-big" style="background:${isLeader?'rgba(255,179,0,.2)':p.color+'22'};color:${isLeader?'var(--gold)':p.color||'#29ABE2'};overflow:hidden">${avatarHTML(p, true)}</div>
-    <div class="profile-name">${p.full_name||'عضو'}</div>
+    <div class="profile-av-big" style="position:relative;background:${isLeader?'rgba(255,179,0,.2)':p.color+'22'};color:${isLeader?'var(--gold)':p.color||'#29ABE2'};overflow:hidden;${isLeader?'':rankFXStyle(p.rank)}">${avatarHTML(p, true)}${isLeader?'':rankBadgeHTML(p.rank)}</div>
+    <div class="profile-name">${isLeader?(p.full_name||'عضو'):rankNameHTML(p)}</div>
     <div class="profile-rank">${p.email}</div>
     <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:12px">
       ${isLeader
@@ -2974,15 +2990,38 @@ function setSendingState(sending, which) {
 }
 
 // ================================================================
+//  🎉 مودال احتفالي "خرافي" لما العضو يترقى — بيعرض التأثير والمكافأة الفعلية
+// ================================================================
+function showRankUpModal(rankName) {
+  const r = RANKS.find(x => x.n === rankName);
+  if (!r) return;
+  const burst = ['✨','🎉','⭐','💥','🌟'];
+  showModal(`
+    <div style="text-align:center;padding:6px 4px 2px;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:0;pointer-events:none;font-size:22px;opacity:.5">
+        ${Array.from({length:10}).map((_,i)=>`<span style="position:absolute;left:${(i*37)%100}%;top:${(i*23)%100}%;animation:floatCrown ${1.6+(i%3)*.4}s ease-in-out infinite">${burst[i%burst.length]}</span>`).join('')}
+      </div>
+      <div style="position:relative;z-index:1">
+        <div style="width:92px;height:92px;border-radius:50%;margin:6px auto 10px;display:flex;align-items:center;justify-content:center;font-size:44px;background:${r.c}18;${rankFXStyle(r.n) || `box-shadow:0 0 0 2px ${r.c},0 0 20px 6px ${r.c}66`}">${r.i}</div>
+        <div style="font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase">ترقية جديدة!</div>
+        <div style="font-size:22px;font-weight:900;margin:4px 0 2px;${rankNameStyle(r.n) || `color:${r.c}`}">${r.n}</div>
+        ${r.max ? '<div style="font-size:11px;color:#FFD700;font-weight:700;margin-bottom:6px">✨ وصلت لأعلى رتبة ممكنة في TAM+ ✨</div>' : ''}
+        ${r.reward ? `<div class="rank-reward" style="margin:14px 0 4px"><i class="ti ti-gift"></i> ${r.reward}</div>` : ''}
+      </div>
+    </div>
+    <div class="modal-btns"><button class="btn-primary" onclick="closeModal()">🎊 يلا نكمل</button></div>`);
+}
+
+// ================================================================
 //  RANKS
 // ================================================================
 function renderRanks() {
   if (el('rk-l1')) { el('rk-l1').textContent = LEVEL_XP[0]; el('rk-l2').textContent = LEVEL_XP[1]; el('rk-l3').textContent = LEVEL_XP[2]; }
   el('rank-grid').innerHTML = RANKS.map(r => `
     <div class="rank-card ${r.m?'mc':''} ${r.grand?'gm':''} ${r.max?'legendary':''}">
-      ${r.max?'<div class="rank-crown-float">👑</div>':''}
-      <div class="rank-icon">${r.i}</div>
-      <div class="rank-name" style="color:${r.c}">${r.n}</div>
+      ${(r.max||r.grand)?'<div class="rank-crown-float">'+r.i+'</div>':''}
+      <div class="rank-icon" style="${rankFXStyle(r.n) ? `filter:none;` : ''}">${r.i}</div>
+      <div class="rank-name" style="${rankNameStyle(r.n) || `color:${r.c}`}">${r.n}</div>
       ${r.max?'<div class="rank-xp" style="color:#FFD700;font-weight:700">✨ الرتبة الأسطورية القصوى ✨</div>':`<div class="rank-xp">${LEVEL_XP[0]} → ${LEVEL_XP[1]} → ${LEVEL_XP[2]} XP</div><div class="rank-levels">${[0,1,2].map(()=>'<div class="lvl-dot"></div>').join('')}</div>`}
       ${r.reward?`<div class="rank-reward"><i class="ti ti-gift"></i> ${r.reward}</div>`:''}
     </div>`).join('');
@@ -3181,7 +3220,7 @@ async function loadRoomChat() {
 
 async function loadRoomMessages() {
   const { data: msgs, error } = await sb.from('elite_messages')
-    .select('*, profiles!elite_messages_sender_id_fkey(full_name,color,role,avatar_type,avatar_value,avatar_status)')
+    .select('*, profiles!elite_messages_sender_id_fkey(full_name,color,rank,role,avatar_type,avatar_value,avatar_status)')
     .order('created_at', {ascending: true})
     .limit(50);
   if (error) { console.log('room chat error:', error.message); }
@@ -3190,9 +3229,9 @@ async function loadRoomMessages() {
   box.innerHTML = msgs?.length ? msgs.map(m => {
     const isMe = m.sender_id === currentUser.id;
     return `<div style="display:flex;flex-direction:${isMe?'row-reverse':'row'};gap:6px;align-items:flex-end">
-      <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:${m.profiles?.color||'#29ABE2'}44;color:${m.profiles?.color||'#29ABE2'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${avatarHTML(m.profiles)}</div>
+      <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:${m.profiles?.color||'#29ABE2'}44;color:${m.profiles?.color||'#29ABE2'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;${rankFXStyle(m.profiles?.rank)}">${avatarHTML(m.profiles)}</div>
       <div>
-        <div style="font-size:9px;color:var(--muted);margin-bottom:2px;text-align:${isMe?'left':'right'}">${m.profiles?.full_name||'عضو'}</div>
+        <div style="font-size:9px;color:var(--muted);margin-bottom:2px;text-align:${isMe?'left':'right'}">${rankNameHTML(m.profiles||{full_name:'عضو'})}</div>
         <div style="display:flex;align-items:center;gap:4px;flex-direction:${isMe?'row-reverse':'row'}">
           <div style="max-width:220px;background:${isMe?'linear-gradient(135deg,var(--blue),#1a7aad)':'var(--surface)'};border:1px solid var(--border);border-radius:${isMe?'12px 2px 12px 12px':'2px 12px 12px 12px'};padding:7px 10px;font-size:11px">${renderMsgBody(m)}</div>
           ${isLeader?`<button onclick="delRoomMsg('${m.id}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--red);opacity:.5;padding:2px" title="حذف">🗑</button>`:''}
@@ -3524,6 +3563,70 @@ function rankColor(rank) {
   const r = RANKS.find(x => x.n === rank);
   return r ? r.c : 'var(--blue)';
 }
+
+// ================================================================
+//  💎 تأثيرات الرتب الخرافية — توهج/نار/برق/قوس قزح حول الأفاتار + اسم متوهج
+//  بترجع inline style بتتحط جنب أي أفاتار في الموقع (بروفايل، بوديوم، شات، قوائم الأعضاء)
+// ================================================================
+function rankFX(rank) {
+  const map = {
+    'Master':             {s1:'0 0 0 2px var(--gold),0 0 6px 1px rgba(255,179,0,.5)'},
+    'Master I':           {s1:'0 0 0 2px #FFD700,0 0 8px 2px rgba(255,215,0,.55)'},
+    'Master II':          {s1:'0 0 0 2px #FFDD00,0 0 6px 2px rgba(255,221,0,.4)', s2:'0 0 0 2px #FFDD00,0 0 14px 5px rgba(255,221,0,.7)', anim:'rkPulseGlow 2s ease-in-out infinite'},
+    'Master III':         {custom:'rkFireGlow 1.3s ease-in-out infinite'},
+    'Master IV':          {s1:'0 0 0 2px #00D4FF,0 0 6px 2px rgba(0,212,255,.4)', s2:'0 0 0 2px #00D4FF,0 0 16px 6px rgba(0,212,255,.7)', anim:'rkPulseGlow 2.2s ease-in-out infinite'},
+    'Master V':           {s1:'0 0 0 2px #9B59B6,0 0 6px 2px rgba(155,89,182,.4)', s2:'0 0 0 2px #9B59B6,0 0 16px 6px rgba(155,89,182,.7)', anim:'rkPulseGlow 2.4s ease-in-out infinite'},
+    'Master VI':          {custom:'rkLightning 1.1s ease-in-out infinite'},
+    'Master VII':         {custom:'rkWaveGlow 2.6s ease-in-out infinite'},
+    'Master VIII':        {s1:'0 0 0 2px #F39C12,0 0 6px 2px rgba(243,156,18,.4)', s2:'0 0 0 2px #F39C12,0 0 18px 6px rgba(243,156,18,.75)', anim:'rkPulseGlow 2s ease-in-out infinite'},
+    'Master IX':          {s1:'0 0 0 2px #8E44AD,0 0 8px 3px rgba(142,68,173,.5)', s2:'0 0 0 3px #8E44AD,0 0 20px 8px rgba(142,68,173,.8)', anim:'rkPulseGlow 2.8s ease-in-out infinite'},
+    'Master X':           {s1:'0 0 0 2px var(--gold),0 0 10px 3px rgba(255,179,0,.55)', s2:'0 0 0 3px var(--gold),0 0 22px 9px rgba(255,179,0,.85)', anim:'rkPulseGlow 2s ease-in-out infinite', badge:'👑'},
+    'MasterX MAX':        {custom:'rkRainbowSpin 3s linear infinite', badge:'🌌'},
+    'Grand Master':       {s1:'0 0 0 2px #00E5FF,0 0 10px 3px rgba(0,229,255,.55)', s2:'0 0 0 3px #00E5FF,0 0 24px 10px rgba(0,229,255,.85)', anim:'rkPulseGlow 2.2s ease-in-out infinite', badge:'🔱'},
+    'Grand Master X':     {custom:'rkRainbowSpin 2.4s linear infinite', badge:'⚜️'},
+    'Grand Master X MAX': {custom:'rkLegendaryGlow 2.2s ease-in-out infinite', badge:'👑'},
+  };
+  const cfg = map[rank];
+  if (!cfg) return { style:'', badge:'' };
+  const style = cfg.custom
+    ? `animation:${cfg.custom};`
+    : `box-shadow:${cfg.s2 ? cfg.s1 : cfg.s1};${cfg.anim ? `--rk-s1:${cfg.s1};--rk-s2:${cfg.s2};animation:${cfg.anim};` : ''}`;
+  return { style, badge: cfg.badge || '' };
+}
+// نسخة مختصرة بترجع الـ style بس، عشان تتحط جوه أي attribute style موجود من غير ما تكسره
+function rankFXStyle(rank) { return rankFX(rank).style; }
+// شارة عائمة (تاج/رمز) للرتب العليا بس — لازم تتحط جوه عنصر بـ position:relative
+function rankBadgeHTML(rank) {
+  const b = rankFX(rank).badge;
+  return b ? `<div class="rk-badge-float">${b}</div>` : '';
+}
+function rankNameStyle(rank) {
+  const glow = {
+    'Master':'color:var(--gold);font-weight:700',
+    'Master I':'color:#FFD700;text-shadow:0 0 6px rgba(255,215,0,.5);font-weight:700',
+    'Master II':'color:#FFDD00;text-shadow:0 0 7px rgba(255,221,0,.6);font-weight:700',
+    'Master III':'color:#FF6B35;text-shadow:0 0 8px rgba(255,107,53,.7);font-weight:700',
+    'Master IV':'color:#00D4FF;text-shadow:0 0 8px rgba(0,212,255,.7);font-weight:700',
+    'Master V':'color:#9B59B6;text-shadow:0 0 8px rgba(155,89,182,.7);font-weight:700',
+    'Master VI':'color:#E74C3C;text-shadow:0 0 8px rgba(231,76,60,.7);font-weight:700',
+    'Master VII':'color:#2ECC71;text-shadow:0 0 8px rgba(46,204,113,.7);font-weight:700',
+    'Master VIII':'color:#F39C12;text-shadow:0 0 8px rgba(243,156,18,.7);font-weight:700',
+    'Master IX':'color:#8E44AD;text-shadow:0 0 9px rgba(142,68,173,.75);font-weight:700',
+    'Master X':'color:var(--gold);text-shadow:0 0 10px rgba(255,179,0,.8);font-weight:800',
+  };
+  const rainbow = colors => `background:linear-gradient(90deg,${colors.join(',')});background-size:250% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:rkNameShimmer 2.5s linear infinite;font-weight:800`;
+  if (rank === 'MasterX MAX') return rainbow(['#FF00FF','#00E5FF','#FFD700','#FF00FF']);
+  if (rank === 'Grand Master') return 'color:#00E5FF;text-shadow:0 0 10px rgba(0,229,255,.85);font-weight:800';
+  if (rank === 'Grand Master X') return rainbow(['#FF3CAC','#00E5FF','#FF3CAC']);
+  if (rank === 'Grand Master X MAX') return rainbow(['#FFD700','#FF00FF','#00E5FF','#FFD700']);
+  return glow[rank] || '';
+}
+function rankNameHTML(m) {
+  const name = m?.full_name || m?.email || 'عضو';
+  const style = rankNameStyle(m?.rank);
+  return style ? `<span style="${style}">${name}</span>` : name;
+}
+
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
