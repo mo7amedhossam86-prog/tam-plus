@@ -618,6 +618,21 @@ select.inp{cursor:pointer}
         <div class="news-list" id="news-list"></div>
       </div>
 
+      <!-- WORLD CHAT (broadcast: everyone reads, leader only writes) -->
+      <div class="page" id="page-world">
+        <div class="page-title"><div class="pt-l"><i class="ti ti-speakerphone"></i>شات العالم</div></div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:14px">
+          <div class="sec-title" style="margin-bottom:10px">📢 بث عام لكل الأعضاء <span style="font-size:9px;color:var(--muted)">القائد بس اللي يقدر يبعت هنا</span></div>
+          <div id="world-chat-msgs" style="height:340px;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px">
+            <div style="text-align:center;color:var(--muted);font-size:11px">جاري تحميل الرسائل...</div>
+          </div>
+          <div id="world-inp-row" style="display:flex;gap:8px;align-items:center">
+            <input class="inp" id="world-msg-inp" placeholder="اكتب إعلان لكل الأعضاء..." style="flex:1" onkeypress="if(event.key==='Enter')sendWorldMsg()">
+            <button class="send-btn" id="world-send-btn" onclick="sendWorldMsg()"><i class="ti ti-send" style="font-size:14px"></i></button>
+          </div>
+        </div>
+      </div>
+
       <!-- CHAT -->
       <div class="page" id="page-chat">
         <div class="page-title"><div class="pt-l"><i class="ti ti-message-circle"></i>الشات الخاص</div></div>
@@ -1576,7 +1591,9 @@ function renderSidebar() {
     <div class="nav-divider"></div>
     <div class="nav-section">التواصل</div>
     <div class="nav-item" id="nav-news" onclick="navigate('news')"><i class="ti ti-news"></i><span>الأخبار</span></div>
+    <div class="nav-item" id="nav-world" onclick="navigate('world')"><i class="ti ti-speakerphone"></i><span>شات العالم</span></div>
     <div class="nav-item" id="nav-chat" onclick="navigate('chat')"><i class="ti ti-message-circle"></i><span>الشات الخاص</span></div>
+
     <div class="nav-item" id="nav-room" onclick="navigate('room')"><i class="ti ti-shield-star"></i><span>الغرفة الخاصة</span></div>
     <div class="nav-item" id="nav-support" onclick="navigate('support')"><i class="ti ti-headset"></i><span>رسائل الدعم</span></div>
     <div class="nav-divider"></div>
@@ -1596,6 +1613,7 @@ function renderSidebar() {
     <div class="nav-item" id="nav-ranks" onclick="navigate('ranks')"><i class="ti ti-trophy"></i><span>الرتب</span></div>
     <div class="nav-divider"></div>
     <div class="nav-item" id="nav-news" onclick="navigate('news')"><i class="ti ti-news"></i><span>الأخبار</span></div>
+    <div class="nav-item" id="nav-world" onclick="navigate('world')"><i class="ti ti-speakerphone"></i><span>شات العالم</span></div>
     <div class="nav-item" id="nav-chat" onclick="navigate('chat')"><i class="ti ti-message-circle"></i><span>رسائلي الخاصة</span></div>
     <div class="nav-item" id="nav-room" onclick="navigate('room')"><i class="ti ti-shield-star"></i><span>الغرفة الخاصة</span></div>
     <div class="nav-item" id="nav-rules" onclick="navigate('rules')"><i class="ti ti-gavel"></i><span>قوانين الفريق</span></div>
@@ -1713,6 +1731,7 @@ function navigate(page) {
   if (page === 'mytasks') { loadMyTasks(); loadTasks(); loadGroupTasks(); }
   if (page === 'roster') loadRoster();
   if (page === 'news') loadNews();
+  if (page === 'world') loadWorldChat();
   if (page === 'chat') initChat();
   if (page === 'room') { loadRoom(); setTimeout(loadRoomChat, 500); }
   if (page === 'rules') loadRules();
@@ -1749,6 +1768,10 @@ function startRealtimeSubscriptions() {
     sb.channel("news-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "news" }, () => {
         loadNews();
+      }).subscribe();
+    sb.channel("world-messages-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "world_messages" }, () => {
+        if (document.getElementById('page-world')?.classList.contains('active')) loadWorldChat();
       }).subscribe();
     sb.channel("elite-messages-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "elite_messages" }, () => {
@@ -1796,6 +1819,13 @@ function startRealtimeSubscriptions() {
         loadNews();
         if (payload.eventType === 'INSERT') {
           addMemberNotif(`📢 خبر جديد: ${payload.new.title}`);
+        }
+      }).subscribe();
+    sb.channel("world-messages-member-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "world_messages" }, (payload) => {
+        if (document.getElementById('page-world')?.classList.contains('active')) loadWorldChat();
+        if (payload.eventType === 'INSERT' && payload.new?.sender_id !== currentUser.id) {
+          addMemberNotif(`📣 رسالة جديدة في شات العالم: ${payload.new.content || '📎 مرفق جديد'}`);
         }
       }).subscribe();
     sb.channel("rules-member-changes")
@@ -3438,6 +3468,52 @@ async function sendRoomMsg() {
   loadRoomMessages();
 }
 
+// ================================================================
+//  WORLD CHAT — بث عام يقراه كل الأعضاء، والقائد بس اللي يبعت فيه
+// ================================================================
+async function loadWorldChat() {
+  const inpRow = el('world-inp-row');
+  if (inpRow) inpRow.style.display = isLeader ? 'flex' : 'none';
+  const { data: msgs, error } = await sb.from('world_messages')
+    .select('*, profiles!world_messages_sender_id_fkey(full_name,color,rank,role,avatar_type,avatar_value,avatar_status)')
+    .order('created_at', {ascending: true})
+    .limit(50);
+  if (error) { console.log('world chat error:', error.message); }
+  const box = el('world-chat-msgs');
+  if (!box) return;
+  box.innerHTML = msgs?.length ? msgs.map(m => {
+    return `<div style="display:flex;gap:6px;align-items:flex-end">
+      <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:${m.profiles?.color||'var(--gold)'}44;color:${m.profiles?.color||'var(--gold)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${avatarHTML(m.profiles)}</div>
+      <div>
+        <div style="font-size:9px;color:var(--muted);margin-bottom:2px">${rankNameHTML(m.profiles||{full_name:'👑 القائد'})}</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="max-width:260px;background:var(--surface);border:1px solid var(--gold)44;border-radius:2px 12px 12px 12px;padding:7px 10px;font-size:11px">${renderMsgBody(m)}</div>
+          ${isLeader?`<button onclick="delWorldMsg('${m.id}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--red);opacity:.5;padding:2px" title="حذف">🗑</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('') : '<div style="text-align:center;color:var(--muted);font-size:11px">لا توجد رسائل بعد</div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendWorldMsg() {
+  if (!isLeader) return;
+  const content = v('world-msg-inp');
+  if (!content.trim()) return;
+  const row = { sender_id: currentUser.id, sender_name: userProfile?.full_name || 'القائد', content: content.trim() };
+  const { error } = await sb.from('world_messages').insert(row);
+  if (error) { alert('❌ الرسالة ما اتبعتتش: ' + error.message); return; }
+  sendPushToAll('📣 رسالة جديدة من القائد', row.content, '/');
+  el('world-msg-inp').value = '';
+  loadWorldChat();
+}
+
+async function delWorldMsg(id) {
+  if (!isLeader) return;
+  await sb.from('world_messages').delete().eq('id', id);
+  loadWorldChat();
+}
+
 function penaltyModal(id, name, xp, maxXp, level, rank) {
   const pct = Math.min(100, Math.round(xp/maxXp*100));
   const rc = rankColor(rank);
@@ -4044,6 +4120,17 @@ window.addEventListener('load', () => {
        created_at TIMESTAMPTZ DEFAULT NOW()
      );
 
+     -- جدول شات العالم (بث عام): كل الأعضاء يقروا، القائد بس اللي يبعت
+     CREATE TABLE world_messages (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       sender_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+       sender_name TEXT,
+       content TEXT,
+       media_url TEXT,
+       media_type TEXT,
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
      -- جدول القوانين
      CREATE TABLE rules (
        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -4110,6 +4197,7 @@ window.addEventListener('load', () => {
      ALTER TABLE news ENABLE ROW LEVEL SECURITY;
      ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
      ALTER TABLE elite_messages ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE world_messages ENABLE ROW LEVEL SECURITY;
      ALTER TABLE rules ENABLE ROW LEVEL SECURITY;
      ALTER TABLE bands ENABLE ROW LEVEL SECURITY;
      ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
@@ -4192,6 +4280,15 @@ window.addEventListener('load', () => {
        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
      );
 
+     -- شات العالم: أي عضو مسجل دخول يقرا، بس القائد بس اللي يبعت أو يحذف
+     CREATE POLICY "everyone reads world messages" ON world_messages FOR SELECT USING (true);
+     CREATE POLICY "leader sends world messages" ON world_messages FOR INSERT WITH CHECK (
+       auth.uid() = sender_id AND EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+     CREATE POLICY "leader deletes world messages" ON world_messages FOR DELETE USING (
+       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
+     );
+
      CREATE POLICY "everyone reads rules" ON rules FOR SELECT USING (true);
      CREATE POLICY "everyone reads bands" ON bands FOR SELECT USING (true);
      CREATE POLICY "read settings" ON settings FOR SELECT USING (true);
@@ -4214,7 +4311,7 @@ window.addEventListener('load', () => {
      );
 
      -- تفعيل Realtime على الجداول المطلوبة من Database → Replication:
-     -- messages / elite_messages / tasks / task_submissions / news / profiles / bands / guest_messages
+     -- messages / elite_messages / world_messages / tasks / task_submissions / news / profiles / bands / guest_messages
 
      -- ================================================================
      -- 📎 إعداد تخزين الوسائط (صور/فيديو/صوت/ملفات + الرسائل الصوتية) في الشات الخاص وشات النخبة
