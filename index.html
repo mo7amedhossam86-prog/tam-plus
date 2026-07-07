@@ -1517,18 +1517,33 @@ function renderTopbar() {
 let lastPendingCount = 0;
 let lastMsgCount = 0;
 let lastSupportCount = 0;
+let lastRoomMsgCount = 0;
 async function checkPendingNotif() {
   const { data: pending } = await sb.from('profiles').select('id').eq('status','pending');
   const avatarPendingCount = await countPendingAvatars();
   const { count: unreadMsgCount } = await sb.from('messages').select('id', {count:'exact', head:true}).eq('receiver_id', currentUser.id).eq('read', false);
   const { count: unreadSupportCount } = await sb.from('guest_messages').select('id', {count:'exact', head:true}).eq('sender','guest').eq('read', false);
+  // الغرفة الخاصة: القائد دايماً له صلاحية، والعضو لازم يكون مسجل في room_members
+  let eliteAccess = isLeader;
+  if (!isLeader) {
+    const { data: rm } = await sb.from('room_members').select('user_id').eq('user_id', currentUser.id).maybeSingle();
+    eliteAccess = !!rm;
+  }
+  let unreadRoomCount = 0;
+  if (eliteAccess) {
+    const { count } = await sb.from('elite_messages').select('id', {count:'exact', head:true})
+      .neq('sender_id', currentUser.id).gt('created_at', getRoomLastSeen());
+    unreadRoomCount = count || 0;
+  }
   const dot = document.getElementById("notif-dot");
   const navEl = document.getElementById('nav-pending');
   const navChat = document.getElementById('nav-chat');
   const navSupport = document.getElementById('nav-support');
+  const navRoom = document.getElementById('nav-room');
   const count = pending?.length || 0;
   const msgCount = unreadMsgCount || 0;
   const supportCount = unreadSupportCount || 0;
+  const roomCount = unreadRoomCount || 0;
   if (count > 0) {
     if (navEl) {
       const badge = `<i class="ti ti-user-check"></i><span>طلبات الانضمام</span><span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${count}</span>`;
@@ -1540,10 +1555,13 @@ async function checkPendingNotif() {
     }
   }
   if (navChat) {
-    navChat.innerHTML = `<i class="ti ti-message-circle"></i><span>الشات الخاص</span>${msgCount>0?`<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${msgCount}</span>`:''}`;
+    navChat.innerHTML = `<i class="ti ti-message-circle"></i><span>${isLeader?'الشات الخاص':'شاتي مع القائد'}</span>${msgCount>0?`<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${msgCount}</span>`:''}`;
   }
   if (navSupport) {
     navSupport.innerHTML = `<i class="ti ti-headset"></i><span>رسائل الدعم</span>${supportCount>0?`<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${supportCount}</span>`:''}`;
+  }
+  if (navRoom) {
+    navRoom.innerHTML = `<i class="ti ti-shield-star"></i><span>الغرفة الخاصة</span>${roomCount>0?`<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${roomCount}</span>`:''}`;
   }
   if (msgCount > lastMsgCount) {
     sendLocalNotif('TAM+ 💬', `${msgCount - lastMsgCount} رسالة جديدة بانتظار ردك`);
@@ -1551,10 +1569,14 @@ async function checkPendingNotif() {
   if (supportCount > lastSupportCount) {
     sendLocalNotif('TAM+ 🆘', `${supportCount - lastSupportCount} رسالة دعم جديدة من زائر`);
   }
-  if (dot) dot.style.display = (count > 0 || avatarPendingCount > 0 || msgCount > 0 || supportCount > 0) ? "block" : "none";
+  if (roomCount > lastRoomMsgCount) {
+    sendLocalNotif('TAM+ 🏰', `${roomCount - lastRoomMsgCount} رسالة جديدة في غرفة النخبة`);
+  }
+  if (dot) dot.style.display = (count > 0 || avatarPendingCount > 0 || msgCount > 0 || supportCount > 0 || roomCount > 0) ? "block" : "none";
   lastPendingCount = count;
   lastMsgCount = msgCount;
   lastSupportCount = supportCount;
+  lastRoomMsgCount = roomCount;
 }
 
 // دوسة على اللوجو فوق شمال: بيلف ثم يعمل ريفريش كامل للصفحة
@@ -1598,9 +1620,10 @@ function navigate(page) {
 let memberNotifs = []; // قائمة الإشعارات للعضو
 
 function startRealtimeSubscriptions() {
+  // تشغيل نظام التنبيهات (الأجراس + الإشعارات المحلية) لكل المستخدمين، قائد وأعضاء
+  checkPendingNotif();
+  setInterval(checkPendingNotif, 10000);
   if (isLeader) {
-    checkPendingNotif();
-    setInterval(checkPendingNotif, 10000);
     sb.channel("profiles-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
         checkPendingNotif(); loadPending(); loadMembers(); loadDashboard();
@@ -1623,6 +1646,7 @@ function startRealtimeSubscriptions() {
     sb.channel("elite-messages-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "elite_messages" }, () => {
         loadRoomMessages();
+        checkPendingNotif();
       }).subscribe();
     sb.channel("leader-inbox-messages")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
@@ -1688,7 +1712,17 @@ function startRealtimeSubscriptions() {
     sb.channel("room-msg-member")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "elite_messages" }, (payload) => {
         loadRoomMessages();
-        if (payload.new?.sender_id !== currentUser.id) addMemberNotif('💬 رسالة جديدة في غرفة النخبة');
+        if (payload.new?.sender_id !== currentUser.id) { addMemberNotif('💬 رسالة جديدة في غرفة النخبة'); checkPendingNotif(); }
+      }).subscribe();
+    // رسائل خاصة جديدة (من القائد أو من أي عضو) — تحديث فوري للجرس والتنبيه بدل انتظار الفحص الدوري
+    sb.channel("member-inbox-messages")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        if (payload.new?.receiver_id === currentUser.id) {
+          checkPendingNotif();
+          if (currentChatUserId !== payload.new.sender_id || !document.getElementById('page-chat')?.classList.contains('active')) {
+            addMemberNotif('💬 رسالة جديدة وصلتلك');
+          }
+        }
       }).subscribe();
     // أي تغيير في أي بروفايل (صورة/إيموجي غيّره أي عضو أو القائد) ينعكس فوراً لكل الأعضاء
     // بدل ما يفضل مخفي لحد ما حد يعمل refresh يدوي للصفحة
@@ -2395,6 +2429,22 @@ async function sendMsg() {
 
 function getChatKey(id1, id2) {
   return [id1, id2].sort().join('_');
+}
+
+// ================================================================
+//  تتبّع "آخر ظهور" في شات الغرفة الخاصة — عشان نعرف نحسب رسايل غير مقروءة
+//  (محفوظة محلياً في متصفح كل مستخدم، مفيش داعي لتعديل قاعدة البيانات)
+// ================================================================
+function roomSeenKey() {
+  return 'tam_room_seen_' + (currentUser?.id || 'anon');
+}
+function getRoomLastSeen() {
+  return localStorage.getItem(roomSeenKey()) || new Date(0).toISOString();
+}
+function markRoomSeen() {
+  localStorage.setItem(roomSeenKey(), new Date().toISOString());
+  lastRoomMsgCount = 0;
+  checkPendingNotif();
 }
 
 // ================================================================
@@ -3120,10 +3170,12 @@ async function loadRoomChat() {
       <div id="room-file-preview" style="display:none;padding:4px 2px;font-size:10px;color:var(--gold)"></div>
     </div>`;
   await loadRoomMessages();
+  markRoomSeen();
   // Realtime على جدول elite_messages المخصص والمحمي بـ RLS بدل استغلال جدول الرسائل العام
   sb.channel('elite-chat-realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'elite_messages' }, () => {
       loadRoomMessages();
+      markRoomSeen();
     }).subscribe();
 }
 
