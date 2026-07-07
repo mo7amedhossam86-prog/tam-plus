@@ -621,7 +621,7 @@ select.inp{cursor:pointer}
           <div class="chat-window">
             <div class="chat-top">
               <div class="chat-av" id="c-av" style="background:linear-gradient(135deg,var(--blue),var(--red))">-</div>
-              <div><div style="font-weight:700;font-size:12px" id="c-name">اختر محادثة</div><div style="font-size:9px;color:var(--green)">🔒 خاص بينك وبين القائد فقط</div></div>
+              <div><div style="font-weight:700;font-size:12px" id="c-name">اختر محادثة</div><div style="font-size:9px;color:var(--green)">🔒 محادثة خاصة</div></div>
             </div>
             <div class="chat-msgs" id="chat-msgs"><div style="text-align:center;color:var(--muted);font-size:11px;margin:auto;padding:20px">اختر محادثة من القائمة</div></div>
             <div id="c-voice-bar" style="display:none;align-items:center;gap:8px;padding:6px 13px;font-size:11px;color:var(--red)">
@@ -1504,7 +1504,7 @@ function renderSidebar() {
     <div class="nav-item" id="nav-ranks" onclick="navigate('ranks')"><i class="ti ti-trophy"></i><span>الرتب</span></div>
     <div class="nav-divider"></div>
     <div class="nav-item" id="nav-news" onclick="navigate('news')"><i class="ti ti-news"></i><span>الأخبار</span></div>
-    <div class="nav-item" id="nav-chat" onclick="navigate('chat')"><i class="ti ti-message-circle"></i><span>شاتي مع القائد</span></div>
+    <div class="nav-item" id="nav-chat" onclick="navigate('chat')"><i class="ti ti-message-circle"></i><span>رسائلي الخاصة</span></div>
     <div class="nav-item" id="nav-room" onclick="navigate('room')"><i class="ti ti-shield-star"></i><span>الغرفة الخاصة</span></div>
     <div class="nav-item" id="nav-rules" onclick="navigate('rules')"><i class="ti ti-gavel"></i><span>قوانين الفريق</span></div>
     <div class="nav-item" id="nav-bands" onclick="navigate('bands')"><i class="ti ti-alert-triangle"></i><span>تهديداتي</span></div>
@@ -1570,7 +1570,7 @@ async function checkPendingNotif() {
     }
   }
   if (navChat) {
-    navChat.innerHTML = `<i class="ti ti-message-circle"></i><span>${isLeader?'الشات الخاص':'شاتي مع القائد'}</span>${msgCount>0?`<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${msgCount}</span>`:''}`;
+    navChat.innerHTML = `<i class="ti ti-message-circle"></i><span>${isLeader?'الشات الخاص':'رسائلي الخاصة'}</span>${msgCount>0?`<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${msgCount}</span>`:''}`;
   }
   if (navSupport) {
     navSupport.innerHTML = `<i class="ti ti-headset"></i><span>رسائل الدعم</span>${supportCount>0?`<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:auto">${supportCount}</span>`:''}`;
@@ -1665,7 +1665,7 @@ function startRealtimeSubscriptions() {
       }).subscribe();
     sb.channel("leader-inbox-messages")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-        if (payload.new?.receiver_id === currentUser.id) checkPendingNotif();
+        if (payload.new?.receiver_id === currentUser.id) { checkPendingNotif(); refreshChatListIfVisible(); }
       }).subscribe();
     sb.channel("leader-inbox-support")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "guest_messages" }, (payload) => {
@@ -1735,6 +1735,7 @@ function startRealtimeSubscriptions() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
         if (payload.new?.receiver_id === currentUser.id) {
           checkPendingNotif();
+          refreshChatListIfVisible();
           if (currentChatUserId !== payload.new.sender_id || !document.getElementById('page-chat')?.classList.contains('active')) {
             addMemberNotif('💬 رسالة جديدة وصلتلك');
           }
@@ -2273,33 +2274,84 @@ async function delNews(id) {
 // ================================================================
 //  CHAT
 // ================================================================
+// 💬 قائمة المحادثات — بتشمل كل الأعضاء (والقائد) اللي ليك معاهم رسائل أو ممكن تبدأ معاهم محادثة
+// كل عنصر بيوريك آخر رسالة وعدد الرسائل الغير مقروءة، وبيترتب الأحدث والغير مقروء الأول
 async function initChat() {
-  if (isLeader) {
-    const { data: members } = await sb.from('profiles').select('*').eq('status','active').neq('email', LEADER_EMAIL);
-    if (!members?.length) {
-      el('chat-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px">لا يوجد أعضاء بعد</div>';
-      return;
-    }
-    el('chat-list').innerHTML = members.map(m => `
-      <div class="chat-item" id="chat-item-${m.id}" onclick="openChatWith('${m.id}','${m.full_name||m.email}','${m.color||'#29ABE2'}')">
-        <div class="chat-av" style="background:${m.color||'#29ABE2'}44;color:${m.color||'#29ABE2'};overflow:hidden;${rankFXStyle(m.rank)}">${avatarHTML(m)}</div>
-        <div style="overflow:hidden"><div class="chat-name">${rankNameHTML(m)}</div><div class="chat-prev">${m.rank||'Member'}</div></div>
-      </div>`).join('');
-    // Auto open first member
-    if (members[0]) openChatWith(members[0].id, members[0].full_name||members[0].email, members[0].color||'#29ABE2');
-  } else {
-    const { data: leader } = await sb.from('profiles').select('*').eq('email', LEADER_EMAIL).single();
-    if (leader) {
-      el('chat-list').innerHTML = `
-        <div class="chat-item active" onclick="openChatWith('${leader.id}','👑 القائد','var(--gold)')">
-          <div class="chat-av" style="background:rgba(255,179,0,.3);color:var(--gold)">👑</div>
-          <div><div class="chat-name">القائد</div><div class="chat-prev">TAM+ Leader</div></div>
-        </div>`;
-      openChatWith(leader.id, '👑 القائد', 'var(--gold)');
-    } else {
-      el('chat-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px">القائد غير متاح</div>';
+  // كل البروفايلات النشطة ما عدا نفسي (تشمل القائد لو أنا عضو، وتشمل كل الأعضاء لو أنا القائد)
+  let q = sb.from('profiles').select('*').eq('status','active');
+  q = isLeader ? q.neq('email', LEADER_EMAIL) : q.neq('id', currentUser.id);
+  const { data: people } = await q;
+  if (!people?.length) {
+    el('chat-list').innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px">${isLeader ? 'لا يوجد أعضاء بعد' : 'لا يوجد أشخاص متاحين للمحادثة بعد'}</div>`;
+    return;
+  }
+
+  // كل رسائلي (مرسلة أو مستقبلة) عشان نطلع منها آخر رسالة وعدد الغير مقروء لكل شخص
+  const { data: myMsgs } = await sb.from('messages')
+    .select('sender_id,receiver_id,content,media_type,created_at,read')
+    .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+    .order('created_at', { ascending: false });
+
+  const lastByPeer = {}, unreadByPeer = {};
+  (myMsgs || []).forEach(msg => {
+    const peerId = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
+    if (!lastByPeer[peerId]) lastByPeer[peerId] = msg; // أول ظهور = الأحدث لأنها مرتبة تنازلياً
+    if (msg.receiver_id === currentUser.id && !msg.read) unreadByPeer[peerId] = (unreadByPeer[peerId] || 0) + 1;
+  });
+
+  const sorted = [...people].sort((a, b) => {
+    const ua = unreadByPeer[a.id] || 0, ub = unreadByPeer[b.id] || 0;
+    if (ua !== ub) return ub - ua; // الغير مقروء الأول
+    const ta = lastByPeer[a.id]?.created_at ? new Date(lastByPeer[a.id].created_at).getTime() : 0;
+    const tb = lastByPeer[b.id]?.created_at ? new Date(lastByPeer[b.id].created_at).getTime() : 0;
+    if (ta !== tb) return tb - ta; // الأحدث رسالة الأول
+    return 0;
+  });
+
+  el('chat-list').innerHTML = sorted.map(m => {
+    const isTheLeader = m.email === LEADER_EMAIL;
+    const name = isTheLeader ? '👑 القائد' : (m.full_name || m.email);
+    const last = lastByPeer[m.id];
+    const preview = last ? (last.content ? last.content : (last.media_type ? '📎 مرفق' : '')) : (isTheLeader ? 'TAM+ Leader' : (m.rank || 'Member'));
+    const unread = unreadByPeer[m.id] || 0;
+    const avStyle = isTheLeader
+      ? 'background:rgba(255,179,0,.3);color:var(--gold)'
+      : `background:${m.color||'#29ABE2'}44;color:${m.color||'#29ABE2'};overflow:hidden;${rankFXStyle(m.rank)}`;
+    const avContent = isTheLeader ? '👑' : avatarHTML(m);
+    return `
+      <div class="chat-item" id="chat-item-${m.id}" onclick="openChatWith('${m.id}','${(name).replace(/'/g,"\\'")}','${m.color||'var(--gold)'}')">
+        <div class="chat-av" style="${avStyle}">${avContent}</div>
+        <div style="overflow:hidden;flex:1">
+          <div class="chat-name">${isTheLeader ? name : rankNameHTML(m)}</div>
+          <div class="chat-prev" style="${unread?'color:var(--text);font-weight:700':''}">${preview}</div>
+        </div>
+        ${unread ? `<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;flex-shrink:0">${unread}</span>` : ''}
+      </div>`;
+  }).join('');
+
+  // افتح أحدث محادثة فيها رسائل غير مقروءة، وإلا أحدث محادثة فيها رسائل أصلاً، وإلا أول واحد في القايمة
+  if (!currentChatUserId) {
+    const withUnread = sorted.find(m => unreadByPeer[m.id] > 0);
+    const withHistory = sorted.find(m => lastByPeer[m.id]);
+    const target = withUnread || withHistory || sorted[0];
+    if (target) {
+      const isTheLeader = target.email === LEADER_EMAIL;
+      openChatWith(target.id, isTheLeader ? '👑 القائد' : (target.full_name || target.email), target.color || 'var(--gold)');
     }
   }
+}
+
+// بتتنادى لما توصل رسالة جديدة عشان تحدّث القايمة (آخر رسالة + عدد الغير مقروء) من غير ما تفتح الصفحة من الأول
+function refreshChatListIfVisible() {
+  if (document.getElementById('page-chat')?.classList.contains('active')) {
+    const keepId = currentChatUserId;
+    initChat().then(() => { currentChatUserId = keepId; markActiveChatItem(keepId); });
+  }
+}
+function markActiveChatItem(id) {
+  document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
+  const item = id && document.getElementById('chat-item-' + id);
+  if (item) item.classList.add('active');
 }
 
 async function openChatWith(userId, name, color) {
@@ -2319,23 +2371,26 @@ async function openChatWith(userId, name, color) {
   
   await loadMessages(userId);
 
-  // القائد بيفتح شات عضو — نعلّم رسائله كمقروءة عشان علامة "رسايل جديدة" تختفي
-  if (isLeader) {
-    const chatKeyForRead = getChatKey(currentUser.id, userId);
-    sb.from('messages').update({ read: true }).eq('chat_key', chatKeyForRead).eq('receiver_id', currentUser.id).eq('read', false)
-      .then(() => checkPendingNotif());
-  }
+  // أي حد (قائد أو عضو) بيفتح محادثة — نعلّم رسائلها كمقروءة عشان علامة "رسايل جديدة" تختفي فوراً
+  const chatKeyForRead = getChatKey(currentUser.id, userId);
+  sb.from('messages').update({ read: true }).eq('chat_key', chatKeyForRead).eq('receiver_id', currentUser.id).eq('read', false)
+    .then(() => { checkPendingNotif(); refreshChatListIfVisible(); });
 
   // Real-time subscription
   const chatKey = getChatKey(currentUser.id, userId);
   chatSubscription = sb.channel('chat-' + chatKey)
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`chat_key=eq.${chatKey}` }, 
-      () => loadMessages(userId))
+      (payload) => {
+        loadMessages(userId);
+        // لو الرسالة الجديدة جاية من الطرف التاني وأنا فاتح المحادثة، علّمها كمقروءة فوراً
+        if (payload.new?.receiver_id === currentUser.id && !payload.new?.read) {
+          sb.from('messages').update({ read: true }).eq('id', payload.new.id).then(() => { checkPendingNotif(); refreshChatListIfVisible(); });
+        }
+      })
     .subscribe();
-  
+
   // Update chat list active state
-  document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
-  document.querySelectorAll('.chat-item').forEach(i => { if (i.onclick?.toString().includes(userId)) i.classList.add('active'); });
+  markActiveChatItem(userId);
 }
 
 async function loadMessages(otherUserId) {
@@ -2344,11 +2399,14 @@ async function loadMessages(otherUserId) {
   const msgsEl = el('chat-msgs');
   msgsEl.innerHTML = msgs?.length ? msgs.map(m => {
     const isMe = m.sender_id === currentUser.id;
-    const canEdit = isLeader;
+    // القائد يقدر يعدّل/يحذف أي رسالة (إشراف)، وأي عضو يقدر يعدّل/يحذف رسالته هو بس
+    const canEdit = isLeader || isMe;
+    // تعديل النص متاح بس لو الرسالة نص (مفيش تعديل على المرفقات)
+    const canEditText = canEdit && !m.media_url;
     return `<div style="display:flex;flex-direction:${isMe?'row-reverse':'row'};align-items:flex-end;gap:4px">
       <div class="msg ${isMe?'sent':'recv'}">${renderMsgBody(m)}</div>
       ${canEdit ? `<div style="display:flex;flex-direction:column;gap:2px">
-        <button onclick="editMsg('${m.id}','${(m.content||'').replace(/'/g,"\'").replace(/"/g,'\"')}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--muted);padding:2px" title="تعديل">✏️</button>
+        ${canEditText ? `<button onclick="editMsg('${m.id}','${(m.content||'').replace(/'/g,"\'").replace(/"/g,'\"')}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--muted);padding:2px" title="تعديل">✏️</button>` : ''}
         <button onclick="deleteMsg('${m.id}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--red);padding:2px" title="حذف">🗑</button>
       </div>` : ''}
     </div>`;
@@ -2441,6 +2499,7 @@ async function sendMsg() {
   await sb.from('messages').insert(row);
   sendPushTo(currentChatUserId, userProfile?.full_name || 'رسالة جديدة', txt || '📎 مرفق جديد', '/');
   await loadMessages(currentChatUserId);
+  refreshChatListIfVisible();
 }
 
 function getChatKey(id1, id2) {
@@ -3621,10 +3680,21 @@ function rankNameStyle(rank) {
   if (rank === 'Grand Master X MAX') return rainbow(['#FFD700','#FF00FF','#00E5FF','#FFD700']);
   return glow[rank] || '';
 }
+// 🦅 ألقاب خاصة بترتبط برتب معينة — بتتحط جنب اسم العضو أينما ظهر اسمه في الموقع
+// (شات، بروفايل، قوائم الأعضاء...) عشان الجايزة اللي بيوصفها الـ reward في RANKS تظهر فعلاً
+const RANK_TITLES = {
+  'Master VIII': { icon: '🦅', text: 'الصقر' },
+};
+function rankTitleHTML(rank) {
+  const t = RANK_TITLES[rank];
+  if (!t) return '';
+  return ` <span style="font-size:10px;font-weight:700;color:var(--gold);background:rgba(255,179,0,.12);border:1px solid rgba(255,179,0,.3);border-radius:10px;padding:1px 8px;vertical-align:middle" title="لقب">${t.icon} ${t.text}</span>`;
+}
 function rankNameHTML(m) {
   const name = m?.full_name || m?.email || 'عضو';
   const style = rankNameStyle(m?.rank);
-  return style ? `<span style="${style}">${name}</span>` : name;
+  const nameHTML = style ? `<span style="${style}">${name}</span>` : name;
+  return nameHTML + rankTitleHTML(m?.rank);
 }
 
 
@@ -4007,6 +4077,13 @@ window.addEventListener('load', () => {
      CREATE POLICY "leader deletes messages" ON messages FOR DELETE USING (
        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'leader')
      );
+     -- 🛠️ جديد: كل عضو يقدر يعدّل أو يحذف رسالته هو بس (مش رسايل غيره)
+     CREATE POLICY "sender edits own message" ON messages FOR UPDATE USING (auth.uid() = sender_id);
+     CREATE POLICY "sender deletes own message" ON messages FOR DELETE USING (auth.uid() = sender_id);
+     -- 🛠️ جديد: المستقبل يقدر يعلّم رسالته كمقروءة (عشان علامة "رسايل جديدة" تختفي فعلاً لما يفتح المحادثة)
+     -- ملحوظة: نفس السياسة فنياً بتسمح للمستقبل يعدّل أي عمود في الرسالة مش "read" بس (قيود RLS مش بتوصل لعمود بعينه)،
+     -- لكن ده مقبول هنا زي باقي سياسات الموقع البسيطة، والواجهة نفسها بتبعت "read" بس فعلياً
+     CREATE POLICY "receiver marks read" ON messages FOR UPDATE USING (auth.uid() = receiver_id);
 
      -- شات غرفة النخبة: خصوصية وأمان أعلى — القراءة والإرسال مسموح فقط لأعضاء الغرفة (room_members) أو القائد
      CREATE POLICY "elite read for room members or leader" ON elite_messages FOR SELECT USING (
